@@ -181,6 +181,11 @@ This keeps `/tmp/codea.log` continuously updated so you can inspect it at any ti
 kill %1   # or: pkill -f "codea logs --follow"
 ```
 
+## Codea API Documentation
+
+- **Legacy runtime**: https://codea.io/reference/index.html
+- **Modern runtime (Carbide)**: https://twolivesleft.github.io/Codea4-Docs/
+
 ## Notes for Agents
 
 - Always `pull` before editing to get the latest files from device
