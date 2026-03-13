@@ -322,6 +322,17 @@ def screenshot(output, profile):
     click.echo(f"Screenshot saved to {out_path} ({len(data):,} bytes)")
 
 
+@main.command("idle-timer")
+@click.argument("state", type=click.Choice(["on", "off"]))
+@click.option("--profile", default="default", help="Device profile.")
+def idle_timer(state, profile):
+    """Enable or disable the device idle timer. Use 'off' to keep the screen awake."""
+    client = get_client(profile)
+    disabled = state == "off"
+    result = client.call_tool("setIdleTimerDisabled", {"disabled": disabled})
+    click.echo(client.text(result))
+
+
 @main.command()
 @click.option("--tail", "tail", default=None, type=int, metavar="N", help="Show only the last N lines.")
 @click.option("--head", "head", default=None, type=int, metavar="N", help="Show only the first N lines (useful to find the original error in a spammy log).")
