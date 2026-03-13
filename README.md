@@ -25,7 +25,7 @@ To make the skill available to AI agents (Claude Code, Cursor, Cline, and [40+ o
 npx skills add twolivesleft/codea-agent-skill
 ```
 
-This installs the skill globally (`~/.claude/skills/codea-cli/`) or project-locally (`.claude/skills/codea-cli/`), where supported agents automatically discover it.
+This installs the skill globally (`~/.claude/skills/codea/`) or project-locally (`.claude/skills/codea/`), where supported agents automatically discover it.
 
 ## Quick Start
 

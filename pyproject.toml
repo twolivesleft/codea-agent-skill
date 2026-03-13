@@ -22,4 +22,4 @@ dev = [
 codea = "codea.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["codea"]
+packages = ["scripts/codea"]
