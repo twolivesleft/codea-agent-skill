@@ -293,6 +293,24 @@ def restart(profile):
     click.echo(client.text(client.call_tool("restartProject")))
 
 
+@main.command()
+@click.option("--profile", default="default", help="Device profile.")
+def pause(profile):
+    """Pause the running Codea project."""
+    client = get_client(profile)
+    client.execute_lua("viewer.paused = true")
+    click.echo("Project paused")
+
+
+@main.command()
+@click.option("--profile", default="default", help="Device profile.")
+def resume(profile):
+    """Resume the paused Codea project."""
+    client = get_client(profile)
+    client.execute_lua("viewer.paused = false")
+    click.echo("Project resumed")
+
+
 @main.command("exec")
 @click.argument("code")
 @click.option("--profile", default="default", help="Device profile.")

@@ -126,6 +126,8 @@ codea screenshot --output result.png
 | `codea stop` | Stop the running project |
 | `codea restart` | Restart the running project |
 | `codea exec "<lua>"` | Execute Lua in the running project |
+| `codea pause` | Pause the running project |
+| `codea resume` | Resume the paused project |
 | `codea screenshot` | Save screenshot as PNG |
 | `codea idle-timer <on\|off>` | Enable or disable the idle timer (`off` keeps the screen awake) |
 | `codea logs` | Get all log output since last clear |

@@ -146,6 +146,8 @@ Options for `push`: `--input <dir>` to specify the local source directory (defau
 | `codea stop` | Stop the running project |
 | `codea restart` | Restart the running project |
 | `codea exec "<lua>"` | Execute a Lua expression in the running project |
+| `codea pause` | Pause the running project |
+| `codea resume` | Resume the paused project |
 | `codea screenshot [--output <file>]` | Capture the device screen as a PNG (default: `screenshot.png`) |
 | `codea idle-timer <on\|off>` | Enable or disable the idle timer (`off` keeps the screen awake) |
 | `codea logs` | Get all log output since last clear |
