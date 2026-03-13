@@ -50,7 +50,9 @@ codea pull "My Game"
 codea push "My Game"
 codea push "My Game" Main.lua Player.lua
 
-# 4. Run and observe
+# 4. Start log monitoring, then run
+codea clear-logs
+codea logs --follow >> /tmp/codea.log &
 codea run "My Game"
 sleep 3
 codea screenshot --output result.png
@@ -59,9 +61,13 @@ codea screenshot --output result.png
 codea exec "print(health)"
 
 # 6. Check logs
-codea logs
+cat /tmp/codea.log
 
-# 7. Iterate
+# 7. Iterate (push changes, restart, check logs again)
+codea push "My Game" Main.lua
+codea restart
+sleep 2
+cat /tmp/codea.log
 ```
 
 ### Creating a new project
@@ -152,6 +158,27 @@ My Game/
 `Dependencies/<name>/` files to the correct project on the device.
 
 Use `--output <dir>` with pull and `--input <dir>` with push to specify a custom directory.
+
+## Log Monitoring with --follow
+
+The recommended pattern for monitoring logs while working is to start a background log stream before running the project:
+
+```bash
+codea clear-logs
+codea logs --follow >> /tmp/codea.log &
+codea run "My Game"
+
+# ... edit files, push changes, take screenshots ...
+
+cat /tmp/codea.log          # check all logs at any point
+tail -n 20 /tmp/codea.log   # check recent output
+```
+
+This keeps `/tmp/codea.log` continuously updated so you can inspect it at any time without missing output between polls. Kill the background process when done:
+
+```bash
+kill %1   # or: pkill -f "codea logs --follow"
+```
 
 ## Notes for Agents
 
