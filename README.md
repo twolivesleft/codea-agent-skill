@@ -9,11 +9,23 @@ A CLI tool that lets AI agents (and humans) control [Codea](https://codea.io) re
 
 ## Installation
 
+### CLI tool
+
 ```bash
 git clone https://github.com/twolivesleft/codea-agent-skill.git
 cd codea-agent-skill
 pip install -e .
 ```
+
+### Agent skill
+
+To make the skill available to AI agents (Claude Code, Cursor, Cline, and [40+ others](https://github.com/vercel-labs/skills)):
+
+```bash
+npx skills add twolivesleft/codea-agent-skill
+```
+
+This installs the skill globally (`~/.claude/skills/codea/`) or project-locally (`.claude/skills/codea/`), where supported agents automatically discover it.
 
 ## Quick Start
 

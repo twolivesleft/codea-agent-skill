@@ -1,6 +1,11 @@
+---
+name: codea
+description: Control Codea on a connected iOS, iPadOS, or macOS device. Use this skill when working on Codea projects — pulling code, editing files, pushing changes, running projects, capturing screenshots, and inspecting state via Lua.
+---
+
 # Codea Skill
 
-This directory contains the `codea` CLI tool for working with Codea projects on a connected iOS/macOS device.
+This directory contains the `codea` CLI tool for working with Codea projects on a connected iOS, iPadOS, or macOS device.
 
 ## Setup
 
