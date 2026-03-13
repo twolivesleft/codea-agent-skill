@@ -191,7 +191,23 @@ kill %1   # or: pkill -f "codea logs --follow"
 
 ## Codea API Documentation
 
-- **Legacy runtime**: https://codea.io/reference/index.html
+Before using any Codea API, fetch the relevant documentation page first. The reference is organized by topic — always identify the right section before coding.
+
+- **Legacy runtime index**: https://codea.io/reference/index.html
+  - Animation: https://codea.io/reference/Animation.html
+  - Craft (3D): https://codea.io/reference/Craft.html
+  - Display & keyboard: https://codea.io/reference/Display.html
+  - Graphics & assets: https://codea.io/reference/Graphics.html
+  - Lua: https://codea.io/reference/Lua.html
+  - Motion & location: https://codea.io/reference/Accelerometer.html
+  - Network: https://codea.io/reference/Network.html
+  - Parameters: https://codea.io/reference/Parameters.html
+  - Physics: https://codea.io/reference/Physics.html
+  - Shaders & Mesh: https://codea.io/reference/Shaders.html
+  - Sounds: https://codea.io/reference/Sounds.html
+  - Storage: https://codea.io/reference/Storage.html
+  - Touch & input: https://codea.io/reference/Touch.html
+  - Vector: https://codea.io/reference/Vector.html
 - **Modern runtime (Carbide)**: https://twolivesleft.github.io/Codea4-Docs/
 
 ## Notes for Agents
