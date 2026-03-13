@@ -29,6 +29,8 @@ class MCPClient:
             headers={"Content-Type": "application/json"},
             timeout=self.timeout,
         )
+        if response.status_code == 413:
+            raise MCPError("File too large: the Air Code server rejected the payload (413). Try reducing the file size.")
         response.raise_for_status()
         return response.json()
 

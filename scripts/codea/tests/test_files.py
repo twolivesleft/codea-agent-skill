@@ -75,3 +75,12 @@ def test_find_in_files(client, project):
     client.write_file(uri, "function setup()\n  local x = 42\nend\n")
     results = client.find_in_files(project["uri"], "x = 42")
     assert len(results) > 0
+
+
+def test_write_large_file(client, project):
+    """Writing a large file should succeed, not raise a raw HTTPError."""
+    large_content = "-- line\n" * 100_000  # ~800 KB
+    uri = _file_uri(project, "Large.lua")
+    client.write_file(uri, large_content)
+    content = client.read_file(uri)
+    assert content == large_content
