@@ -1,3 +1,4 @@
+import base64
 import json
 import sys
 from pathlib import Path
@@ -215,6 +216,18 @@ def push(project, files, input_dir, profile):
     if not source_dir.exists():
         raise click.ClickException(f"Directory '{source_dir}' does not exist.")
 
+    def push_file(local_path, file_uri, label):
+        try:
+            try:
+                content = local_path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                # Binary file: send as base64
+                content = base64.b64encode(local_path.read_bytes()).decode("ascii")
+            client.write_file(file_uri, content)
+            click.echo(f"  {label}")
+        except MCPError as e:
+            click.echo(f"  {label} (error: {e})", err=True)
+
     if files:
         for filename in files:
             local_path = source_dir / filename
@@ -222,12 +235,7 @@ def push(project, files, input_dir, profile):
                 click.echo(f"  {filename} (not found, skipping)", err=True)
                 continue
             file_uri = f"{project_uri}/{filename}"
-            try:
-                content = local_path.read_text(encoding="utf-8")
-                client.write_file(file_uri, content)
-                click.echo(f"  {filename}")
-            except (MCPError, UnicodeDecodeError) as e:
-                click.echo(f"  {filename} (error: {e})", err=True)
+            push_file(local_path, file_uri, filename)
         click.echo("Done.")
         return
 
@@ -256,12 +264,7 @@ def push(project, files, input_dir, profile):
             filename = "/".join(parts)
             file_uri = f"{project_uri}/{filename}"
 
-        try:
-            content = local_path.read_text(encoding="utf-8")
-            client.write_file(file_uri, content)
-            click.echo(f"  {relative}")
-        except (MCPError, UnicodeDecodeError) as e:
-            click.echo(f"  {relative} (error: {e})", err=True)
+        push_file(local_path, file_uri, str(relative))
 
     click.echo("Done.")
 
@@ -550,3 +553,37 @@ def deps_remove(project, dependency, profile):
     project_uri = find_project_uri(client, project)
     result = client.call_tool("removeDependency", {"path": project_uri, "dependency": dependency})
     click.echo(client.text(result))
+
+
+@main.command()
+@click.argument("project")
+@click.argument("code")
+@click.option("--profile", default="default", help="Device profile.")
+def autocomplete(project, code, profile):
+    """Get Lua autocomplete suggestions for a code prefix.
+
+    PROJECT is the project name or Collection/Project.
+    CODE is the Lua prefix to complete, e.g. 'asset.' or 'vec2'.
+
+    Example: codea autocomplete "My Game" "asset."
+    """
+    client = get_client(profile)
+    project_uri = find_project_uri(client, project)
+    result = client.get_completions(project_uri, code)
+    items = result.get("items", [])
+    if not items:
+        click.echo("(no completions)")
+        return
+
+    kind_names = {
+        1: "text", 2: "method", 3: "function", 4: "constructor",
+        5: "field", 6: "variable", 7: "class", 12: "value",
+        14: "keyword", 15: "snippet", 21: "constant",
+    }
+    for item in items:
+        label = item.get("label", "")
+        kind = kind_names.get(item.get("kind"), "")
+        if kind:
+            click.echo(f"{label} ({kind})")
+        else:
+            click.echo(label)

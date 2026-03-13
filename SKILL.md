@@ -171,6 +171,26 @@ My Game/
 
 Use `--output <dir>` with pull and `--input <dir>` with push to specify a custom directory.
 
+## File Loading Order (Info.plist)
+
+Each Codea project contains an `Info.plist` file. The `Buffer Order` key in this file is an array of strings that defines the order in which Lua files are loaded by the runtime.
+
+```xml
+<key>Buffer Order</key>
+<array>
+    <string>Main</string>
+    <string>ClassA</string>
+    <string>ClassB</string>
+</array>
+```
+
+Managing this order is critical in several scenarios:
+- **Global Variables**: Any global variables or constants must be defined in a file that is loaded *before* they are used by other files.
+- **Class Inheritance**: Base classes must be loaded before any derived classes that inherit from them.
+- **Initialization**: Logic that expects certain systems to be initialized globally should be ordered appropriately.
+
+When creating a new project with `codea new` and pulling it locally, the `Buffer Order` will typically only contain `Main`. As you add new `.lua` files to the project, you **must** update the `Buffer Order` in `Info.plist` and push the changes back to the device to ensure the project runs correctly.
+
 ## Log Monitoring with --follow
 
 The recommended pattern for monitoring logs while working is to start a background log stream before running the project:

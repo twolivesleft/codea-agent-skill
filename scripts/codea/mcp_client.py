@@ -139,3 +139,9 @@ class MCPClient:
             "wholeWord": whole_word,
             "isRegex": is_regex,
         }))
+
+    def get_completions(self, project_uri: str, code: str) -> dict:
+        return self.json_result(self.call_tool("getCompletions", {
+            "path": project_uri,
+            "code": code,
+        }))
