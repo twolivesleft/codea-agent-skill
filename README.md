@@ -5,15 +5,9 @@ A CLI tool that lets AI agents (and humans) control [Codea](https://codea.io) re
 ## Requirements
 
 - Python 3.10+
-- Codea running on an iOS or macOS device with **Air Code** enabled
+- Codea running on an iOS, iPadOS, or macOS device with **Air Code** enabled
 
 ## Installation
-
-```bash
-pip install codea-agent-skill
-```
-
-Or install from source:
 
 ```bash
 git clone https://github.com/twolivesleft/codea-agent-skill.git
@@ -30,7 +24,7 @@ With Codea open and Air Code running, scan your local network:
 ```bash
 codea discover
 # Scanning for Codea devices (5s)...
-#   1. iPhone-de-JF.local  (192.168.1.42:18513)
+#   1. My-iPad.local  (192.168.1.42:18513)
 # Saved 192.168.1.42:18513 as profile 'default'.
 ```
 
@@ -44,7 +38,7 @@ codea configure --host 192.168.1.42 --port 18513
 
 ```bash
 codea new "My Game"
-# Created project 'My Game' at codea://...
+# Created project 'My Game'
 ```
 
 ### 3. Pull it locally and edit
@@ -77,7 +71,15 @@ codea restart               # restart without re-pushing
 
 ## Project Naming
 
-Projects are identified as `Collection/Project` (e.g. `Documents/Morse`) or just by name if it's unique across all collections. iCloud projects use `iCloud/Collection/Project`.
+Projects are identified by name alone if it's unique across all collections, or as `Collection/Project` to disambiguate.
+
+### Default collections
+
+| Path | Description |
+|------|-------------|
+| `Documents/MyProject` | Default local collection |
+| `MyCollection/MyProject` | Custom local collection |
+| `iCloud/Documents/MyProject` | iCloud |
 
 ```bash
 codea pull "Morse"                  # unique name — works as-is
@@ -85,12 +87,12 @@ codea pull "Documents/Morse"        # explicit local collection
 codea pull "iCloud/Documents/Foo"   # iCloud project
 ```
 
-When creating projects, the same slash notation works with `codea new`:
+The same notation works when creating projects:
 
 ```bash
-codea new "MyCollection/My Game"
-codea new "My Game" --collection MyCollection
-codea new "My Game" --cloud
+codea new "Morse"                   # creates in default collection (Documents)
+codea new "Documents/Morse"         # explicit collection
+codea new "iCloud/Documents/Morse"  # iCloud
 ```
 
 ---
@@ -102,14 +104,14 @@ codea new "My Game" --cloud
 | Command | Description |
 |---------|-------------|
 | `codea discover` | Scan the local network for Codea devices and save config |
-| `codea configure` | Manually set the device host and port |
+| `codea configure --host <ip> --port <port>` | Manually set the device host and port |
 
 ### Projects
 
 | Command | Description |
 |---------|-------------|
 | `codea ls` | List all projects as `Collection/Project` |
-| `codea new <name>` | Create a new project (supports slash notation and `--collection`, `--cloud`) |
+| `codea new <name>` | Create a new project (supports `Collection/Project` notation) |
 | `codea rename <project> <newname>` | Rename a project |
 | `codea delete <project>` | Delete a project (prompts for confirmation) |
 
@@ -120,6 +122,10 @@ codea new "My Game" --cloud
 | `codea pull <project> [files...]` | Pull a project locally; optionally pull specific files only |
 | `codea push <project> [files...]` | Push files to the device; omit files to push everything |
 
+Options for `pull`: `--output <dir>` to specify a local directory (default: `./<project>`), `--no-deps` to skip dependencies.
+
+Options for `push`: `--input <dir>` to specify the local source directory (default: `./<project>`).
+
 ### Runtime
 
 | Command | Description |
@@ -128,8 +134,8 @@ codea new "My Game" --cloud
 | `codea stop` | Stop the running project |
 | `codea restart` | Restart the running project |
 | `codea exec "<lua>"` | Execute a Lua expression in the running project |
-| `codea screenshot` | Capture the device screen as a PNG (default: `screenshot.png`) |
-| `codea logs` | Get log output from the running project (drains the buffer) |
+| `codea screenshot [--output <file>]` | Capture the device screen as a PNG (default: `screenshot.png`) |
+| `codea logs` | Get log output from the running project |
 | `codea clear-logs` | Clear the log buffer |
 
 ### Collections
@@ -169,7 +175,16 @@ Dependencies are pulled automatically alongside the project. Use `--no-deps` to 
 
 `codea push "My Game"` pushes all files back, automatically routing `Dependencies/<name>/` files to the correct project on the device.
 
-Use `--output <dir>` with `pull` and `--input <dir>` with `push` to use a custom directory.
+```bash
+# Pull to a custom directory
+codea pull "My Game" --output ~/projects/mygame
+
+# Push from a custom directory
+codea push "My Game" --input ~/projects/mygame
+
+# Push only specific files (e.g. while the project is running)
+codea push "My Game" Main.lua Player.lua
+```
 
 ---
 
