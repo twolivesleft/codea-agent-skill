@@ -311,6 +311,19 @@ def resume(profile):
     click.echo("Project resumed")
 
 
+@main.command()
+@click.argument("state", type=click.Choice(["on", "off"]), required=False, default=None)
+@click.option("--profile", default="default", help="Device profile.")
+def paused(state, profile):
+    """Get or set the paused state of the running project. Omit to check current state."""
+    client = get_client(profile)
+    if state is None:
+        click.echo(client.text(client.call_tool("getProjectPaused")))
+    else:
+        client.execute_lua(f"viewer.paused = {'true' if state == 'on' else 'false'}")
+        click.echo("paused" if state == "on" else "not paused")
+
+
 @main.command("exec")
 @click.argument("code")
 @click.option("--profile", default="default", help="Device profile.")
@@ -341,14 +354,18 @@ def screenshot(output, profile):
 
 
 @main.command("idle-timer")
-@click.argument("state", type=click.Choice(["on", "off"]))
+@click.argument("state", type=click.Choice(["on", "off"]), required=False, default=None)
 @click.option("--profile", default="default", help="Device profile.")
 def idle_timer(state, profile):
-    """Enable or disable the device idle timer. Use 'off' to keep the screen awake."""
+    """Get or set the device idle timer. Use 'off' to keep the screen awake, 'on' to re-enable it. Omit to check current state."""
     client = get_client(profile)
-    disabled = state == "off"
-    result = client.call_tool("setIdleTimerDisabled", {"disabled": disabled})
-    click.echo(client.text(result))
+    if state is None:
+        result = client.call_tool("getIdleTimerDisabled")
+        click.echo(client.text(result))
+    else:
+        disabled = state == "off"
+        result = client.call_tool("setIdleTimerDisabled", {"disabled": disabled})
+        click.echo(client.text(result))
 
 
 @main.command()
