@@ -121,7 +121,10 @@ codea screenshot --output result.png
 | `codea restart` | Restart the running project |
 | `codea exec "<lua>"` | Execute Lua in the running project |
 | `codea screenshot` | Save screenshot as PNG |
-| `codea logs` | Get log output from running project (drains buffer) |
+| `codea logs` | Get all log output since last clear |
+| `codea logs --head N` | Get first N lines (useful when an early error causes spam) |
+| `codea logs --tail N` | Get last N lines |
+| `codea logs --follow` | Stream new log lines in real time (Ctrl-C to stop) |
 | `codea clear-logs` | Clear the log buffer |
 
 ### Dependencies
@@ -156,4 +159,5 @@ Use `--output <dir>` with pull and `--input <dir>` with push to specify a custom
 - Use `sleep 2` or similar between `run` and `screenshot` to let the project render a frame
 - `exec` requires a project to already be running
 - Screenshot returns a PNG — save it and use vision to inspect results; do not open it in an external app unless the user explicitly asks
+- `codea logs` accumulates all output since last `clear-logs`; use `--head 20` when Codea is spamming a repeated error to find the original cause
 - File paths on device use `codea://` URIs internally; you don't need to deal with these directly

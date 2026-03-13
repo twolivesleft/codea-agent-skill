@@ -1,5 +1,6 @@
 """Tests for running projects and runtime operations."""
 
+import threading
 import time
 import pytest
 from codea.mcp_client import MCPError
@@ -10,6 +11,17 @@ function setup()
 end
 function draw()
     background(0)
+end
+"""
+
+SPAM_LUA = """\
+function setup()
+    print("first_line")
+    print("second_line")
+    print("third_line")
+end
+function draw()
+    print("spam")
 end
 """
 
@@ -76,6 +88,24 @@ def test_logs(client, project):
         client.stop_project()
 
 
+def test_logs_are_non_draining(client, project):
+    """getLogs should return the same logs on repeated calls (no draining)."""
+    uri = _file_uri(project, "Main.lua")
+    client.write_file(uri, 'function setup() print("persistent_log") end\nfunction draw() end\n')
+
+    client.call_tool("clearLogs")
+    client.run_project(project["uri"])
+    time.sleep(2)
+
+    try:
+        first = client.text(client.call_tool("getLogs"))
+        second = client.text(client.call_tool("getLogs"))
+        assert "persistent_log" in first
+        assert first == second
+    finally:
+        client.stop_project()
+
+
 def test_clear_logs(client, project):
     uri = _file_uri(project, "Main.lua")
     client.write_file(uri, 'function setup() print("will_be_cleared") end\nfunction draw() end\n')
@@ -88,6 +118,65 @@ def test_clear_logs(client, project):
     result = client.call_tool("getLogs")
     logs = client.text(result)
     assert "will_be_cleared" not in logs
+
+
+def test_logs_head(client, project):
+    """--head N returns only the first N lines."""
+    uri = _file_uri(project, "Main.lua")
+    client.write_file(uri, SPAM_LUA)
+
+    client.call_tool("clearLogs")
+    client.run_project(project["uri"])
+    time.sleep(2)
+
+    try:
+        result = client.call_tool("getLogs", {"head": 1})
+        lines = client.text(result).strip().splitlines()
+        assert lines[0] == "first_line"
+        assert len(lines) == 1
+    finally:
+        client.stop_project()
+
+
+def test_logs_tail(client, project):
+    """--tail N returns only the last N lines."""
+    uri = _file_uri(project, "Main.lua")
+    client.write_file(uri, SPAM_LUA)
+
+    client.call_tool("clearLogs")
+    client.run_project(project["uri"])
+    time.sleep(2)
+
+    try:
+        result = client.call_tool("getLogs", {"tail": 1})
+        lines = client.text(result).strip().splitlines()
+        assert len(lines) == 1
+    finally:
+        client.stop_project()
+
+
+def test_logs_stream(client, project):
+    """--follow streams log lines via SSE."""
+    uri = _file_uri(project, "Main.lua")
+    client.write_file(uri, 'function setup() print("streamed_log") end\nfunction draw() end\n')
+
+    client.call_tool("clearLogs")
+    client.run_project(project["uri"])
+    time.sleep(2)
+
+    received = []
+    def collect():
+        for line in client.stream_logs():
+            received.append(line)
+            if len(received) >= 1:
+                break
+
+    t = threading.Thread(target=collect, daemon=True)
+    t.start()
+    t.join(timeout=5)
+
+    client.stop_project()
+    assert any("streamed_log" in line for line in received)
 
 
 def test_screenshot_without_project(client):

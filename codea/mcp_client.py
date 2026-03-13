@@ -117,6 +117,15 @@ class MCPClient:
     def capture_screenshot(self) -> Optional[bytes]:
         return self.image_bytes(self.call_tool("captureScreenshot"))
 
+    def stream_logs(self):
+        """Stream log lines from the SSE /logs/stream endpoint. Yields one line at a time."""
+        url = self.url.replace("/mcp", "/logs/stream")
+        with requests.get(url, stream=True, timeout=None) as r:
+            r.raise_for_status()
+            for line in r.iter_lines(decode_unicode=True):
+                if line.startswith("data: "):
+                    yield line[6:]
+
     def find_in_files(self, project_uri: str, text: str,
                       case_sensitive: bool = False,
                       whole_word: bool = False,

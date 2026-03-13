@@ -1,9 +1,12 @@
 """Tests for CLI options not covered by MCP-level tests.
 
 These tests invoke the codea CLI directly via Click's CliRunner to verify
-options like --output, --input, --no-deps, and specific file pull/push.
+options like --output, --input, --no-deps, specific file pull/push,
+and log filtering (--head, --tail, --follow).
 """
 
+import threading
+import time
 import pytest
 from click.testing import CliRunner
 from pathlib import Path
@@ -138,3 +141,61 @@ def test_push_multiple_specific_files(runner, client, project, tmp_path):
     assert result.exit_code == 0, result.output
     assert client.read_file(f"{project['uri']}/Main.lua") == LUA_MAIN
     assert client.read_file(f"{project['uri']}/Helper.lua") == LUA_HELPER
+
+
+# ---------------------------------------------------------------------------
+# logs --head / --tail / --follow
+# ---------------------------------------------------------------------------
+
+SPAM_LUA = (
+    'function setup()\n'
+    '  print("first_line")\n'
+    '  print("second_line")\n'
+    '  print("third_line")\n'
+    'end\n'
+    'function draw() print("spam") end\n'
+)
+
+
+@pytest.fixture
+def running_project(runner, client, project):
+    """Project running with SPAM_LUA; stopped after test."""
+    client.write_file(f"{project['uri']}/Main.lua", SPAM_LUA)
+    client.call_tool("clearLogs")
+    client.run_project(project["uri"])
+    time.sleep(2)
+    yield project
+    client.stop_project()
+
+
+def test_logs_head(runner, client, running_project):
+    result = runner.invoke(main, ["logs", "--head", "1"])
+    assert result.exit_code == 0, result.output
+    lines = result.output.strip().splitlines()
+    assert lines[0] == "first_line"
+    assert len(lines) == 1
+
+
+def test_logs_tail(runner, client, running_project):
+    result = runner.invoke(main, ["logs", "--tail", "1"])
+    assert result.exit_code == 0, result.output
+    lines = result.output.strip().splitlines()
+    assert len(lines) == 1
+
+
+def test_logs_follow(runner, client, running_project):
+    """--follow streams at least one log line via SSE then stops on KeyboardInterrupt."""
+    received = []
+
+    def stream():
+        # Use the MCP client directly since CliRunner can't send KeyboardInterrupt
+        for line in client.stream_logs():
+            received.append(line)
+            break  # collect just one line and stop
+
+    t = threading.Thread(target=stream, daemon=True)
+    t.start()
+    t.join(timeout=5)
+
+    assert len(received) >= 1
+    assert any("first_line" in line or "spam" in line for line in received)

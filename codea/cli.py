@@ -323,11 +323,26 @@ def screenshot(output, profile):
 
 
 @main.command()
+@click.option("--tail", "tail", default=None, type=int, metavar="N", help="Show only the last N lines.")
+@click.option("--head", "head", default=None, type=int, metavar="N", help="Show only the first N lines (useful to find the original error in a spammy log).")
+@click.option("--follow", "-f", is_flag=True, help="Stream new log lines as they arrive (SSE).")
 @click.option("--profile", default="default", help="Device profile.")
-def logs(profile):
-    """Get log output from the running project (drains the buffer)."""
+def logs(tail, head, follow, profile):
+    """Get log output from the running project."""
     client = get_client(profile)
-    click.echo(client.text(client.call_tool("getLogs")))
+    if follow:
+        try:
+            for line in client.stream_logs():
+                click.echo(line)
+        except KeyboardInterrupt:
+            pass
+        return
+    args = {}
+    if tail is not None:
+        args["tail"] = tail
+    if head is not None:
+        args["head"] = head
+    click.echo(client.text(client.call_tool("getLogs", args or None)))
 
 
 @main.command("clear-logs")

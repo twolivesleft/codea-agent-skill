@@ -147,7 +147,10 @@ Options for `push`: `--input <dir>` to specify the local source directory (defau
 | `codea restart` | Restart the running project |
 | `codea exec "<lua>"` | Execute a Lua expression in the running project |
 | `codea screenshot [--output <file>]` | Capture the device screen as a PNG (default: `screenshot.png`) |
-| `codea logs` | Get log output from the running project |
+| `codea logs` | Get all log output since last clear |
+| `codea logs --head N` | Get first N lines (useful when an early error causes log spam) |
+| `codea logs --tail N` | Get last N lines |
+| `codea logs --follow` / `-f` | Stream new log lines in real time via SSE (Ctrl-C to stop) |
 | `codea clear-logs` | Clear the log buffer |
 
 ### Collections
