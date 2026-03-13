@@ -37,6 +37,12 @@ codea pull "iCloud/Documents/Foo"   # iCloud project
 
 ## Typical Agent Workflow
 
+Always disable the idle timer at the start of a session so the device screen stays awake:
+
+```bash
+codea idle-timer off
+```
+
 ### Editing an existing project
 
 ```bash
