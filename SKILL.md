@@ -52,9 +52,10 @@ codea pull "My Game"
 
 # 2. Read and edit files (use standard file tools)
 
-# 3. Push changes back — entire project or specific files
-codea push "My Game"
+# 3. Push only the modified files (prefer this over pushing the entire project)
 codea push "My Game" Main.lua Player.lua
+# Push entire project only if you don't know which files changed
+codea push "My Game"
 
 # 4. Start log monitoring, then run
 codea clear-logs
@@ -232,6 +233,16 @@ Before using any Codea API, fetch the relevant documentation page first. The ref
   - Touch & input: https://codea.io/reference/Touch.html
   - Vector: https://codea.io/reference/Vector.html
 - **Modern runtime (Carbide)**: https://twolivesleft.github.io/Codea4-Docs/
+
+## Best Practices & Gotchas
+
+### Asset Strings
+Asset strings using the `Project:Asset` format (e.g., `readImage("Blobbo:empty")`) are **deprecated**. You should use static assets instead:
+- **Correct**: `asset.empty` or `asset.wall`
+- **Deprecated**: `readImage("Project:empty")`
+
+### Missing `roundRect`
+The `roundRect` function is not built-in to the Codea runtime. If your project requires rounded rectangles, you must implement the function yourself (e.g., using `mesh` or drawing multiple `rect` and `ellipse` calls).
 
 ## Notes for Agents
 
