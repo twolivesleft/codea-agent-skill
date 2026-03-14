@@ -90,7 +90,15 @@ def pull_project_files(client: MCPClient, project_uri: str, output_dir: Path, fi
 
 # --- CLI ---
 
-@click.group()
+class _Group(click.Group):
+    def invoke(self, ctx):
+        try:
+            return super().invoke(ctx)
+        except MCPError as e:
+            raise click.ClickException(str(e))
+
+
+@click.group(cls=_Group)
 def main():
     """Codea CLI — connect to Codea on your device.
 
