@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 import click
 
-from .config import load_config, save_config, DEFAULT_PORT
+from .config import load_config, save_config, DEFAULT_PORT, CONFIG_FILE
 from .discover import discover_devices
 from .mcp_client import MCPClient, MCPError
 
@@ -140,6 +140,67 @@ def configure(host, port, profile):
     """Manually configure device connection."""
     save_config(host, port, profile)
     click.echo(f"Saved {host}:{port} as profile '{profile}'.")
+
+
+@main.command()
+@click.option("--profile", default="default", help="Profile name.")
+def status(profile):
+    """Show current device configuration and state."""
+    import os, json as _json
+    host_env = os.environ.get("CODEA_HOST")
+    port_env = os.environ.get("CODEA_PORT")
+
+    # Resolve host/port and source label
+    host = port = source = None
+    if host_env:
+        host = host_env
+        port = int(port_env) if port_env else DEFAULT_PORT
+        source = "environment variables"
+    elif CONFIG_FILE.exists():
+        with open(CONFIG_FILE) as f:
+            config = _json.load(f)
+        profiles = config.get("profiles", {})
+        if profile in profiles:
+            p = profiles[profile]
+            host = p["host"]
+            port = p.get("port", DEFAULT_PORT)
+            source = str(CONFIG_FILE)
+        elif profiles:
+            click.echo(f"Profile '{profile}' not found. Available profiles: {', '.join(profiles)}")
+            return
+
+    if host is None:
+        click.echo("Not configured. Run 'codea discover' or 'codea configure'.")
+        return
+
+    click.echo(f"Host:    {host}")
+    click.echo(f"Port:    {port}")
+    click.echo(f"Profile: {profile}")
+    click.echo(f"Source:  {source}")
+
+    # Fetch live device state
+    try:
+        client = MCPClient(host, port)
+        state = client.get_device_state()
+        project_state = state.get("state", "none")
+        project_name = state.get("project")
+        idle_disabled = state.get("idleTimerDisabled", False)
+        paused = state.get("paused")
+
+        click.echo("")
+        if project_state == "running":
+            label = f"Running: {project_name}" if project_name else "Running"
+            if paused:
+                label += " (paused)"
+            click.echo(f"State:   {label}")
+        elif project_state == "editing":
+            click.echo(f"State:   Editing: {project_name}" if project_name else "State:   Editing")
+        else:
+            click.echo("State:   Idle")
+
+        click.echo(f"Idle timer: {'off (screen stays on)' if idle_disabled else 'on'}")
+    except Exception:
+        click.echo("\nState:   (device unreachable)")
 
 
 @main.command()
@@ -595,3 +656,140 @@ def autocomplete(project, code, profile):
             click.echo(f"{label} ({kind})")
         else:
             click.echo(label)
+
+
+@main.command()
+@click.argument("project")
+@click.argument("type", required=False)
+@click.option("--profile", default="default", help="Device profile.")
+def runtime(project, type, profile):
+    """Get or set the runtime type for a project.
+
+    PROJECT is the project name or Collection/Project.
+    TYPE is optional: 'legacy' or 'modern'. If omitted, shows the current runtime.
+
+    Examples:
+      codea runtime "My Game"           # show current runtime
+      codea runtime "My Game" modern    # switch to modern (Carbide)
+      codea runtime "My Game" legacy    # switch to legacy
+    """
+    client = get_client(profile)
+    project_uri = find_project_uri(client, project)
+    if type is None:
+        click.echo(client.get_runtime(project_uri))
+    else:
+        if type not in ("legacy", "modern"):
+            raise click.ClickException("Runtime type must be 'legacy' or 'modern'.")
+        click.echo(client.set_runtime(project_uri, type))
+
+
+def _print_doc_section(title, doc):
+    """Print one runtime section (Modern or Legacy) of function documentation."""
+    if title:
+        click.echo(title)
+        click.echo("-" * len(title))
+
+    signatures = doc.get("signatures", [])
+
+    # Show shared description once at the top if all signatures share the same one
+    descs = [s.get("description") for s in signatures if s.get("description")]
+    shared_desc = descs[0] if descs and all(d == descs[0] for d in descs) else None
+    if shared_desc:
+        click.echo(shared_desc)
+        click.echo()
+
+    for sig in signatures:
+        label = sig.get("label", "")
+        description = sig.get("description") if not shared_desc else None
+        params = sig.get("parameters", [])
+        returns = sig.get("returns", [])
+
+        click.echo(f"  {label}")
+
+        if description:
+            click.echo(f"    {description}")
+
+        for param in params:
+            name = param.get("name", "")
+            ptype = param.get("type")
+            desc = param.get("description")
+            optional = param.get("optional", False)
+            parts = [f"    {name}"]
+            if ptype:
+                parts.append(ptype)
+            if desc:
+                parts.append(f"– {desc}")
+            elif optional:
+                parts.append("(optional)")
+            click.echo("  ".join(parts))
+
+        for ret in returns:
+            rtype = ret.get("type")
+            rdesc = ret.get("description")
+            if rtype or rdesc:
+                parts = ["→"]
+                if rtype:
+                    parts.append(rtype)
+                if rdesc:
+                    parts.append(f"– {rdesc}")
+                click.echo("    " + " ".join(parts))
+
+        click.echo()
+
+
+@main.command()
+@click.argument("function_name")
+@click.option("--legacy", "filter_runtime", flag_value="legacy", help="Show only legacy documentation.")
+@click.option("--modern", "filter_runtime", flag_value="modern", help="Show only modern (Carbide) documentation.")
+@click.option("--project", default=None, help="Auto-select docs based on the project's runtime type.")
+@click.option("--profile", default="default", help="Device profile.")
+def doc(function_name, filter_runtime, project, profile):
+    """Look up Codea API documentation for a function.
+
+    Shows both legacy and modern (Carbide) documentation by default.
+    Use --legacy or --modern to filter to one runtime, or use --project
+    to automatically show only the docs relevant to a project's runtime.
+
+    Examples:
+      codea doc background
+      codea doc background --modern
+      codea doc background --project "My Game"
+      codea doc sprite --legacy
+    """
+    client = get_client(profile)
+
+    # Resolve --project to a runtime filter (only if not already explicitly set)
+    if project and not filter_runtime:
+        project_uri = find_project_uri(client, project)
+        filter_runtime = client.get_runtime(project_uri)
+
+    result = client.get_function_help(function_name)
+    modern = result.get("modern")
+    legacy = result.get("legacy")
+
+    if filter_runtime == "modern":
+        legacy = None
+    elif filter_runtime == "legacy":
+        modern = None
+
+    if not modern and not legacy:
+        if filter_runtime:
+            raise click.ClickException(
+                f"No {filter_runtime} documentation found for '{function_name}'."
+            )
+        raise click.ClickException(f"No documentation found for '{function_name}'.")
+
+    name = result.get("name", function_name)
+    click.echo(name)
+    click.echo("=" * len(name))
+
+    if modern and legacy:
+        click.echo()
+        _print_doc_section("Modern", modern)
+        _print_doc_section("Legacy", legacy)
+    elif modern:
+        click.echo()
+        _print_doc_section(None, modern)
+    else:
+        click.echo()
+        _print_doc_section(None, legacy)

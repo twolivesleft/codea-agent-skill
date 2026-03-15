@@ -145,3 +145,15 @@ class MCPClient:
             "path": project_uri,
             "code": code,
         }))
+
+    def get_device_state(self) -> dict:
+        return self.json_result(self.call_tool("getDeviceState"))
+
+    def get_runtime(self, project_uri: str) -> str:
+        return self.text(self.call_tool("getRuntime", {"path": project_uri}))
+
+    def set_runtime(self, project_uri: str, runtime: str) -> str:
+        return self.text(self.call_tool("setRuntime", {"path": project_uri, "runtime": runtime}))
+
+    def get_function_help(self, function_name: str) -> dict:
+        return self.json_result(self.call_tool("getFunctionHelp", {"functionName": function_name}))

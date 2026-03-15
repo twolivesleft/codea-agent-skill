@@ -119,6 +119,8 @@ codea screenshot --output result.png
 | `codea new <name>` | Create a new project (see naming above) |
 | `codea rename <project> <newname>` | Rename a project |
 | `codea delete <project>` | Delete a project (prompts for confirmation) |
+| `codea runtime <project>` | Get the runtime type (`legacy` or `modern`) |
+| `codea runtime <project> <type>` | Set the runtime type (`legacy` or `modern`) |
 
 ### Files
 | Command | Description |
@@ -153,6 +155,14 @@ codea screenshot --output result.png
 | `codea deps available <project>` | List projects that can be added as dependencies |
 | `codea deps add <project> <dependency>` | Add a dependency |
 | `codea deps remove <project> <dependency>` | Remove a dependency |
+
+### Documentation
+| Command | Description |
+|---------|-------------|
+| `codea doc <function>` | Look up API documentation for a function (shows both runtimes) |
+| `codea doc <function> --modern` | Show only modern (Carbide) documentation |
+| `codea doc <function> --legacy` | Show only legacy documentation |
+| `codea doc <function> --project <name>` | Auto-select docs based on the project's runtime |
 
 ## Pull / Push Details
 
@@ -213,9 +223,30 @@ This keeps `/tmp/codea.log` continuously updated so you can inspect it at any ti
 kill %1   # or: pkill -f "codea logs --follow"
 ```
 
+## Runtime Types
+
+Codea projects use one of two runtimes, stored as `Runtime Type` in `Info.plist`:
+
+| Type | `Info.plist` value | Description |
+|------|--------------------|-------------|
+| Legacy | `legacy` (or absent) | Codea 3.x APIs |
+| Modern | `modern` | Codea 4.x / Carbide APIs |
+
+Use `codea runtime <project>` to check, and `codea runtime <project> modern` to switch.
+Use `codea doc <function> --project <name>` to get docs for the right runtime automatically.
+
 ## Codea API Documentation
 
-Before using any Codea API, fetch the relevant documentation page first. The reference is organized by topic — always identify the right section before coding.
+Use `codea doc <function>` to look up API documentation directly from the device — no browser needed. Always check docs before using an unfamiliar function.
+
+```bash
+codea doc background                        # show all available docs (legacy + modern)
+codea doc background --project "My Game"    # show only what's relevant to the project
+codea doc background --modern               # force modern (Carbide) docs
+codea doc background --legacy               # force legacy docs
+```
+
+For broader reference, the online docs are organized by topic:
 
 - **Legacy runtime index**: https://codea.io/reference/index.html
   - Animation: https://codea.io/reference/Animation.html
