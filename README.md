@@ -117,6 +117,7 @@ codea new "iCloud/Documents/Morse"  # iCloud
 |---------|-------------|
 | `codea discover` | Scan the local network for Codea devices and save config |
 | `codea configure --host <ip> --port <port>` | Manually set the device host and port |
+| `codea status` | Show current device configuration and live state |
 
 ### Projects
 
@@ -138,6 +139,8 @@ Options for `pull`: `--output <dir>` to specify a local directory (default: `./<
 
 Options for `push`: `--input <dir>` to specify the local source directory (default: `./<project>`).
 
+Options for `doc`: `--legacy` / `--modern` to filter to one runtime, or `--project <name>` to automatically show only docs relevant to that project's runtime.
+
 ### Runtime
 
 | Command | Description |
@@ -148,8 +151,12 @@ Options for `push`: `--input <dir>` to specify the local source directory (defau
 | `codea exec "<lua>"` | Execute a Lua expression in the running project |
 | `codea pause` | Pause the running project |
 | `codea resume` | Resume the paused project |
+| `codea paused [on\|off]` | Get or set the paused state; omit argument to check current state |
 | `codea screenshot [--output <file>]` | Capture the device screen as a PNG (default: `screenshot.png`) |
 | `codea idle-timer <on\|off>` | Enable or disable the idle timer (`off` keeps the screen awake) |
+| `codea runtime <project> [legacy\|modern]` | Get or set the runtime type for a project; omit type to check current |
+| `codea autocomplete <project> <code>` | Get Lua autocomplete suggestions for a code prefix |
+| `codea doc <function>` | Look up Codea API documentation for a function |
 | `codea logs` | Get all log output since last clear |
 | `codea logs --head N` | Get first N lines (useful when an early error causes log spam) |
 | `codea logs --tail N` | Get last N lines |
