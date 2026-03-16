@@ -508,8 +508,9 @@ def clear_logs(profile):
 @click.argument("name")
 @click.option("--collection", default=None, help="Collection to create in (default: first available).")
 @click.option("--cloud", is_flag=True, help="Create in iCloud.")
+@click.option("--template", default=None, help="Template name for the new project (e.g. Default, Modern).")
 @click.option("--profile", default="default", help="Device profile.")
-def new(name, collection, cloud, profile):
+def new(name, collection, cloud, template, profile):
     """Create a new Codea project on the device.
 
     NAME can be just a project name or Collection/Project to specify a collection.
@@ -531,6 +532,8 @@ def new(name, collection, cloud, profile):
         args["collection"] = collection
     if cloud:
         args["cloud"] = True
+    if template is not None:
+        args["template"] = template
 
     result = client.call_tool("createProject", args)
     click.echo(client.text(result))
@@ -599,6 +602,51 @@ def collections_delete(name, profile):
     if not click.confirm(f"Delete collection '{name}'? This cannot be undone."):
         return
     result = client.call_tool("deleteCollection", {"name": name})
+    click.echo(client.text(result))
+
+
+# --- Templates subgroup ---
+
+@main.group()
+def templates():
+    """Manage Codea project templates."""
+    pass
+
+
+@templates.command("ls")
+@click.option("--profile", default="default", help="Device profile.")
+def templates_ls(profile):
+    """List all available templates (built-in and custom)."""
+    client = get_client(profile)
+    result = client.call_tool("listTemplates")
+    for entry in client.json_result(result):
+        click.echo(entry)
+
+
+@templates.command("add")
+@click.argument("project")
+@click.option("--name", default=None, help="Name for the template (defaults to the project name).")
+@click.option("--profile", default="default", help="Device profile.")
+def templates_add(project, name, profile):
+    """Copy a project into the custom templates collection."""
+    client = get_client(profile)
+    project_uri = find_project_uri(client, project)
+    args = {"path": project_uri}
+    if name:
+        args["name"] = name
+    result = client.call_tool("addTemplate", args)
+    click.echo(client.text(result))
+
+
+@templates.command("remove")
+@click.argument("name")
+@click.option("--profile", default="default", help="Device profile.")
+def templates_remove(name, profile):
+    """Remove a custom template by name."""
+    client = get_client(profile)
+    if not click.confirm(f"Remove template '{name}'? This cannot be undone."):
+        return
+    result = client.call_tool("removeTemplate", {"name": name})
     click.echo(client.text(result))
 
 

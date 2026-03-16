@@ -84,6 +84,7 @@ cat /tmp/codea.log
 codea new "My Game"
 codea new "My Game" --collection Documents   # explicit collection
 codea new "My Game" --cloud                  # iCloud
+codea new "My Game" --template Modern        # use Modern (Carbide) template
 
 # 2. Pull it locally — gets the default template files (Main.lua etc.)
 codea pull "My Game"
@@ -132,11 +133,20 @@ Always prefer `--wait` over asking the user to manually switch to Codea first.
 | Command | Description |
 |---------|-------------|
 | `codea ls` | List all projects as Collection/Project |
-| `codea new <name>` | Create a new project (see naming above) |
+| `codea new <name>` | Create a new project (see naming above); `--template <name>` selects a template (e.g. `Default`, `Modern`) |
 | `codea rename <project> <newname>` | Rename a project |
 | `codea delete <project>` | Delete a project (prompts for confirmation) |
 | `codea runtime <project>` | Get the runtime type (`legacy` or `modern`) |
 | `codea runtime <project> <type>` | Set the runtime type (`legacy` or `modern`) |
+
+### Templates
+| Command | Description |
+|---------|-------------|
+| `codea templates ls` | List all templates (built-in and custom) |
+| `codea templates add <project>` | Copy a project into the custom templates collection; `--name <name>` to rename |
+| `codea templates remove <name>` | Remove a custom template (prompts for confirmation) |
+
+Custom templates live in the `Templates` collection and appear in `codea ls` as `Templates/<name>`. They can be edited like any project — use `codea pull "Templates/My Template"` to pull locally, edit files, then `codea push "Templates/My Template"` to update the template.
 
 ### Files
 | Command | Description |

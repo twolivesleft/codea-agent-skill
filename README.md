@@ -105,6 +105,7 @@ The same notation works when creating projects:
 codea new "Morse"                   # creates in default collection (Documents)
 codea new "Documents/Morse"         # explicit collection
 codea new "iCloud/Documents/Morse"  # iCloud
+codea new "Morse" --template Modern # use the Modern (Carbide) template
 ```
 
 ---
@@ -137,9 +138,19 @@ codea --wait run "Foo"   # wait for Codea, then run project
 | Command | Description |
 |---------|-------------|
 | `codea ls` | List all projects as `Collection/Project` |
-| `codea new <name>` | Create a new project (supports `Collection/Project` notation) |
+| `codea new <name>` | Create a new project (supports `Collection/Project` notation); `--template <name>` selects a template |
 | `codea rename <project> <newname>` | Rename a project |
 | `codea delete <project>` | Delete a project (prompts for confirmation) |
+
+### Templates
+
+| Command | Description |
+|---------|-------------|
+| `codea templates ls` | List all templates (built-in and custom) |
+| `codea templates add <project>` | Copy a project into the custom templates collection; `--name <name>` to rename |
+| `codea templates remove <name>` | Remove a custom template (prompts for confirmation) |
+
+Custom templates live in the `Templates` collection and appear in `codea ls` as `Templates/<name>`. They can be edited like any project — use `codea pull "Templates/My Template"` to pull locally, edit files, then `codea push "Templates/My Template"` to update the template.
 
 ### Files
 
