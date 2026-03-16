@@ -1,6 +1,7 @@
 import base64
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -14,6 +15,24 @@ from .mcp_client import MCPClient, MCPError
 
 # --- Helpers ---
 
+def _wait_for_device(host: str, port: int, poll_interval: float = 1.0) -> None:
+    """Poll until the Air Code server at host:port responds."""
+    click.echo("Waiting for Codea...", err=True)
+    start = time.time()
+    while True:
+        try:
+            probe = MCPClient(host, port, timeout=3)
+            probe.initialize()
+            click.echo(f"Codea ready (waited {time.time() - start:.1f}s).", err=True)
+            return
+        except MCPError:
+            # Server responded with an MCP-level error — still reachable
+            click.echo(f"Codea ready (waited {time.time() - start:.1f}s).", err=True)
+            return
+        except Exception:
+            time.sleep(poll_interval)
+
+
 def get_client(profile: str) -> MCPClient:
     config = load_config(profile)
     if not config.get("host"):
@@ -21,7 +40,12 @@ def get_client(profile: str) -> MCPClient:
             "No device configured. Run 'codea discover' or 'codea configure' first.\n"
             "Or set CODEA_HOST (and optionally CODEA_PORT) environment variables."
         )
-    return MCPClient(config["host"], config.get("port", DEFAULT_PORT))
+    host = config["host"]
+    port = config.get("port", DEFAULT_PORT)
+    ctx = click.get_current_context(silent=True)
+    if ctx and ctx.find_root().obj and ctx.find_root().obj.get("wait"):
+        _wait_for_device(host, port)
+    return MCPClient(host, port)
 
 
 def uri_logical_path(uri: str) -> str:
@@ -99,12 +123,21 @@ class _Group(click.Group):
 
 
 @click.group(cls=_Group)
-def main():
+@click.option("--wait", is_flag=True, default=False,
+              help="Wait for Codea to become reachable before running the command. "
+                   "Useful when Codea is backgrounded on your device.")
+@click.pass_context
+def main(ctx, wait):
     """Codea CLI — connect to Codea on your device.
 
     Run 'codea COMMAND --help' for help on a specific command.
+
+    Use --wait to block until Codea's Air Code server responds. Handy when
+    issuing commands remotely while Codea is in the background — the CLI will
+    poll until you switch back to the app.
     """
-    pass
+    ctx.ensure_object(dict)
+    ctx.obj["wait"] = wait
 
 
 @main.command()

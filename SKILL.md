@@ -97,6 +97,21 @@ sleep 3
 codea screenshot --output result.png
 ```
 
+## Global Flag: --wait
+
+```bash
+codea --wait <command>
+```
+
+Blocks until Codea's Air Code server responds, then runs the command. Use this whenever the user may have Codea backgrounded on their device (e.g. they are chatting with you from another app). The CLI will poll silently and report how long it waited.
+
+```bash
+codea --wait ls
+codea --wait run "My Game"
+```
+
+Always prefer `--wait` over asking the user to manually switch to Codea first.
+
 ## Commands
 
 ### Device
@@ -104,6 +119,7 @@ codea screenshot --output result.png
 |---------|-------------|
 | `codea discover` | Scan network for Codea devices, save config |
 | `codea configure` | Manually set device host/port |
+| `codea status` | Show current device config and live state |
 
 ### Collections
 | Command | Description |

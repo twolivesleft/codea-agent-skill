@@ -111,6 +111,19 @@ codea new "iCloud/Documents/Morse"  # iCloud
 
 ## Command Reference
 
+### Global Flags
+
+| Flag | Description |
+|------|-------------|
+| `codea --wait <command>` | Wait for Codea to become reachable before running the command |
+
+`--wait` polls the Air Code server until it responds, then proceeds. Useful when issuing commands remotely while Codea is in the background — the CLI blocks until you switch back to the app on your device. Reports how long it waited.
+
+```bash
+codea --wait ls          # wait for Codea, then list projects
+codea --wait run "Foo"   # wait for Codea, then run project
+```
+
 ### Device Setup
 
 | Command | Description |
