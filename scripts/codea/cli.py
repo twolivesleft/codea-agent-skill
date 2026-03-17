@@ -226,10 +226,8 @@ def status(profile):
             if paused:
                 label += " (paused)"
             click.echo(f"State:   {label}")
-        elif project_state == "editing":
-            click.echo(f"State:   Editing: {project_name}" if project_name else "State:   Editing")
         else:
-            click.echo("State:   Idle")
+            click.echo("State:   No project running")
 
         click.echo(f"Idle timer: {'off (screen stays on)' if idle_disabled else 'on'}")
     except Exception:
