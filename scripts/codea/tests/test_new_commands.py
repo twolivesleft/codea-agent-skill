@@ -1,4 +1,4 @@
-"""Tests for status, runtime, doc, and autocomplete commands.
+"""Tests for status, runtime, doc, search-doc, and autocomplete commands.
 
 These tests use CliRunner for CLI-level validation and the MCP client for
 device interaction where needed.
@@ -191,13 +191,102 @@ def test_doc_with_project_runtime(runner, project):
     assert "background" in result.output.lower()
 
 
+def test_doc_see_also_for_namespaced_function(runner):
+    """doc for a namespaced function should show a See also: section with siblings."""
+    result = runner.invoke(main, ["doc", "storage.has"])
+    assert result.exit_code == 0, result.output
+    assert "See also:" in result.output
+    # Should suggest other storage.* functions
+    assert "storage" in result.output
+
+
+def test_doc_see_also_for_namespace_root(runner):
+    """doc for a namespace root (e.g. 'storage') should show See also: with members."""
+    result = runner.invoke(main, ["doc", "storage"])
+    assert result.exit_code == 0, result.output
+    assert "See also:" in result.output
+
+
+def test_doc_no_see_also_for_isolated_function(runner):
+    """doc for a function with no siblings should not crash (See also may be absent)."""
+    result = runner.invoke(main, ["doc", "background"])
+    assert result.exit_code == 0, result.output
+
+
+# ---------------------------------------------------------------------------
+# search-doc
+# ---------------------------------------------------------------------------
+
+def test_search_doc_returns_results(runner):
+    """search-doc should return results for a known keyword."""
+    result = runner.invoke(main, ["search-doc", "storage"])
+    assert result.exit_code == 0, result.output
+    assert len(result.output.strip()) > 0
+    assert "storage" in result.output.lower()
+
+
+def test_search_doc_shows_runtime_tag(runner):
+    """search-doc results should include [modern], [legacy], or [both] tags."""
+    result = runner.invoke(main, ["search-doc", "background"])
+    assert result.exit_code == 0, result.output
+    assert "[modern]" in result.output or "[legacy]" in result.output or "[both]" in result.output
+
+
+def test_search_doc_no_results_message(runner):
+    """search-doc with no matches should print a helpful message."""
+    result = runner.invoke(main, ["search-doc", "zzz_no_such_thing_xyz"])
+    assert result.exit_code == 0, result.output
+    assert "No documentation" in result.output
+
+
+def test_search_doc_matches_helptext(runner):
+    """search-doc should match against help text, not just function names."""
+    # "fill the screen" is the helpText for background
+    result = runner.invoke(main, ["search-doc", "fill the screen"])
+    assert result.exit_code == 0, result.output
+    assert "background" in result.output.lower()
+
+
+def test_search_doc_modern_filter(runner):
+    """--modern flag should exclude legacy-only results."""
+    result = runner.invoke(main, ["search-doc", "storage", "--modern"])
+    assert result.exit_code == 0, result.output
+    assert "[legacy]" not in result.output
+    assert "storage" in result.output.lower()
+
+
+def test_search_doc_legacy_filter(runner):
+    """--legacy flag should exclude modern-only results."""
+    result = runner.invoke(main, ["search-doc", "background", "--legacy"])
+    assert result.exit_code == 0, result.output
+    assert "[modern]" not in result.output
+    assert "background" in result.output.lower()
+
+
+def test_search_doc_filter_no_results_message(runner):
+    """Filtered search with no matches should include the runtime in the message."""
+    result = runner.invoke(main, ["search-doc", "zzz_no_such_thing_xyz", "--modern"])
+    assert result.exit_code == 0, result.output
+    assert "modern" in result.output.lower()
+
+
+def test_search_doc_project_filter(runner, project):
+    """--project flag should auto-select runtime and filter results."""
+    runner.invoke(main, ["runtime", project["name"], "legacy"])
+    result = runner.invoke(main, ["search-doc", "background", "--project", project["name"]])
+    assert result.exit_code == 0, result.output
+    assert "[modern]" not in result.output
+    assert "background" in result.output.lower()
+
+
 # ---------------------------------------------------------------------------
 # autocomplete
 # ---------------------------------------------------------------------------
 
 def test_autocomplete_returns_results(runner, project):
     """autocomplete should return completions for a known prefix."""
-    result = runner.invoke(main, ["autocomplete", project["name"], "vec2"])
+    # sprite( triggers asset completions — reliable across both runtimes
+    result = runner.invoke(main, ["autocomplete", project["name"], "sprite("])
     assert result.exit_code == 0, result.output
     assert "(no completions)" not in result.output
     assert len(result.output.strip()) > 0

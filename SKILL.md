@@ -185,10 +185,15 @@ Custom templates live in the `Templates` collection and appear in `codea ls` as 
 ### Documentation
 | Command | Description |
 |---------|-------------|
-| `codea doc <function>` | Look up API documentation for a function (shows both runtimes) |
+| `codea autocomplete <project> <code>` | Get Lua autocomplete suggestions for a code prefix (e.g. `"asset."`) |
+| `codea doc <function>` | Look up API documentation for a function (shows both runtimes); includes a "See also" list of related functions |
 | `codea doc <function> --modern` | Show only modern (Carbide) documentation |
 | `codea doc <function> --legacy` | Show only legacy documentation |
 | `codea doc <function> --project <name>` | Auto-select docs based on the project's runtime |
+| `codea search-doc <query>` | Search API docs by keyword; returns matching function names, descriptions, and `[modern]`/`[legacy]`/`[both]` tags |
+| `codea search-doc <query> --modern` | Show only modern (Carbide) results |
+| `codea search-doc <query> --legacy` | Show only legacy results |
+| `codea search-doc <query> --project <name>` | Auto-select runtime based on the project's runtime type |
 
 ## Pull / Push Details
 
@@ -263,13 +268,19 @@ Use `codea doc <function> --project <name>` to get docs for the right runtime au
 
 ## Codea API Documentation
 
-Use `codea doc <function>` to look up API documentation directly from the device — no browser needed. Always check docs before using an unfamiliar function.
+Use `codea doc <function>` to look up API documentation directly from the device — no browser needed. Always check docs before using an unfamiliar function. The output includes a "See also:" line listing sibling functions in the same group, which is useful for discovering related APIs without needing to know their names upfront.
+
+Use `codea search-doc <query>` when you don't know the exact function name — it searches across names, descriptions, and help text in both runtimes and returns a list of matches.
 
 ```bash
 codea doc background                        # show all available docs (legacy + modern)
 codea doc background --project "My Game"    # show only what's relevant to the project
 codea doc background --modern               # force modern (Carbide) docs
 codea doc background --legacy               # force legacy docs
+codea search-doc storage                    # find all storage-related functions
+codea search-doc "draw sprite"              # keyword search across help text
+codea search-doc physics --modern           # modern-only results
+codea search-doc physics --project "My Game"  # auto-select runtime from project
 ```
 
 For broader reference, the online docs are organized by topic:

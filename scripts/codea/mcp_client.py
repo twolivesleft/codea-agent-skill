@@ -157,3 +157,6 @@ class MCPClient:
 
     def get_function_help(self, function_name: str) -> dict:
         return self.json_result(self.call_tool("getFunctionHelp", {"functionName": function_name}))
+
+    def search_docs(self, query: str) -> list:
+        return self.json_result(self.call_tool("searchDocs", {"query": query}))

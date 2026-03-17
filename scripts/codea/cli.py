@@ -874,3 +874,54 @@ def doc(function_name, filter_runtime, project, profile):
     else:
         click.echo()
         _print_doc_section(None, legacy)
+
+    see_also = result.get("seeAlso", [])
+    if see_also:
+        click.echo("See also: " + ", ".join(see_also))
+
+
+@main.command("search-doc")
+@click.argument("query")
+@click.option("--legacy", "filter_runtime", flag_value="legacy", help="Show only legacy results.")
+@click.option("--modern", "filter_runtime", flag_value="modern", help="Show only modern (Carbide) results.")
+@click.option("--project", default=None, help="Auto-select runtime based on the project's runtime type.")
+@click.option("--profile", default="default", help="Device profile.")
+def search_doc(query, filter_runtime, project, profile):
+    """Search Codea API documentation by keyword.
+
+    Searches function names, descriptions, and help text across both legacy
+    and modern (Carbide) runtimes.
+
+    Examples:
+      codea search-doc storage
+      codea search-doc "draw sprite"
+      codea search-doc physics --modern
+      codea search-doc physics --project "My Game"
+    """
+    client = get_client(profile)
+
+    if project and not filter_runtime:
+        project_uri = find_project_uri(client, project)
+        filter_runtime = client.get_runtime(project_uri)
+
+    results = client.search_docs(query)
+
+    if filter_runtime:
+        results = [r for r in results if r.get("runtime") in (filter_runtime, "both")]
+
+    if not results:
+        if filter_runtime:
+            click.echo(f"No {filter_runtime} documentation found matching '{query}'.")
+        else:
+            click.echo(f"No documentation found matching '{query}'.")
+        return
+
+    for item in results:
+        name = item.get("name", "")
+        desc = item.get("description", "")
+        runtime = item.get("runtime", "")
+        tag = f"[{runtime}]" if runtime else ""
+        if desc:
+            click.echo(f"  {name}  – {desc}  {tag}")
+        else:
+            click.echo(f"  {name}  {tag}")

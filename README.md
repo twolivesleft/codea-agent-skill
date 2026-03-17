@@ -163,7 +163,9 @@ Options for `pull`: `--output <dir>` to specify a local directory (default: `./<
 
 Options for `push`: `--input <dir>` to specify the local source directory (default: `./<project>`).
 
-Options for `doc`: `--legacy` / `--modern` to filter to one runtime, or `--project <name>` to automatically show only docs relevant to that project's runtime.
+Options for `doc`: `--legacy` / `--modern` to filter to one runtime, or `--project <name>` to automatically show only docs relevant to that project's runtime. Output includes a "See also:" line listing related functions in the same group.
+
+Options for `search-doc`: `--legacy` / `--modern` to filter to one runtime, or `--project <name>` to automatically filter based on the project's runtime. Returns a flat list of matching functions with brief descriptions and a `[modern]`, `[legacy]`, or `[both]` tag.
 
 ### Runtime
 
@@ -180,7 +182,8 @@ Options for `doc`: `--legacy` / `--modern` to filter to one runtime, or `--proje
 | `codea idle-timer <on\|off>` | Enable or disable the idle timer (`off` keeps the screen awake) |
 | `codea runtime <project> [legacy\|modern]` | Get or set the runtime type for a project; omit type to check current |
 | `codea autocomplete <project> <code>` | Get Lua autocomplete suggestions for a code prefix |
-| `codea doc <function>` | Look up Codea API documentation for a function |
+| `codea doc <function>` | Look up Codea API documentation for a function; includes a "See also" list of related functions |
+| `codea search-doc <query>` | Search API documentation by keyword across both runtimes |
 | `codea logs` | Get all log output since last clear |
 | `codea logs --head N` | Get first N lines (useful when an early error causes log spam) |
 | `codea logs --tail N` | Get last N lines |
