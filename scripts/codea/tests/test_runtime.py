@@ -3,6 +3,8 @@
 import threading
 import time
 import pytest
+from click.testing import CliRunner
+from codea.cli import main
 from codea.mcp_client import MCPError
 
 DRAW_LUA = """\
@@ -185,6 +187,46 @@ def test_screenshot_without_project(client):
     screenshot = client.capture_screenshot()
     assert screenshot is not None
     assert len(screenshot) > 0
+
+
+def test_exec_file_flag(client, project, tmp_path):
+    """--file flag should execute the contents of a Lua file."""
+    uri = _file_uri(project, "Main.lua")
+    client.write_file(uri, DRAW_LUA)
+    client.run_project(project["uri"])
+    time.sleep(2)
+
+    lua_file = tmp_path / "debug.lua"
+    lua_file.write_text('print("from_file")')
+
+    try:
+        runner = CliRunner()
+        result = runner.invoke(main, ["exec", "--file", str(lua_file)])
+        assert result.exit_code == 0, result.output
+
+        client.call_tool("clearLogs")
+        client.execute_lua('print("from_file")')
+        logs = client.text(client.call_tool("getLogs"))
+        assert "from_file" in logs
+    finally:
+        client.stop_project()
+
+
+def test_exec_file_and_code_mutually_exclusive(tmp_path):
+    """Providing both CODE and --file should fail with a usage error."""
+    lua_file = tmp_path / "debug.lua"
+    lua_file.write_text('print("hi")')
+    runner = CliRunner()
+    result = runner.invoke(main, ["exec", "print('hi')", "--file", str(lua_file)])
+    assert result.exit_code != 0
+    assert "not both" in result.output
+
+
+def test_exec_requires_code_or_file():
+    """Providing neither CODE nor --file should fail with a usage error."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["exec"])
+    assert result.exit_code != 0
 
 
 def _file_uri(project, filename):

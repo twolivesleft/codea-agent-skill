@@ -161,6 +161,7 @@ Custom templates live in the `Templates` collection and appear in `codea ls` as 
 | `codea stop` | Stop the running project |
 | `codea restart` | Restart the running project |
 | `codea exec "<lua>"` | Execute Lua in the running project |
+| `codea exec --file <path>` | Execute the contents of a Lua file in the running project |
 | `codea pause` | Pause the running project |
 | `codea resume` | Resume the paused project |
 | `codea paused` | Check whether the running project is paused |

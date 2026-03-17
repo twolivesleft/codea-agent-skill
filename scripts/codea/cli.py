@@ -430,13 +430,24 @@ def paused(state, profile):
 
 
 @main.command("exec")
-@click.argument("code")
+@click.argument("code", required=False)
+@click.option("--file", "lua_file", default=None, type=click.Path(exists=True), help="Execute the contents of a Lua file.")
 @click.option("--profile", default="default", help="Device profile.")
-def exec_lua(code, profile):
+def exec_lua(code, lua_file, profile):
     """Execute Lua code on the running project.
 
-    Example: codea exec "print(scene:findEntity('Player').position)"
+    Pass code directly as an argument, or use --file to execute a file.
+
+    Examples:
+      codea exec "print(scene:findEntity('Player').position)"
+      codea exec --file debug.lua
     """
+    if lua_file and code:
+        raise click.UsageError("Provide either CODE or --file, not both.")
+    if not lua_file and not code:
+        raise click.UsageError("Provide either CODE or --file.")
+    if lua_file:
+        code = click.open_file(lua_file).read()
     client = get_client(profile)
     result = client.execute_lua(code)
     if result:
