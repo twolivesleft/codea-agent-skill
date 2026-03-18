@@ -294,7 +294,7 @@ claude mcp add codea --transport http http://192.168.1.42:18513/mcp
 | **File editing** | Pull locally → edit → push | Read/write files directly on device |
 | **Network scan** | `codea discover` | Configure host manually |
 | **Streaming logs** | `codea logs --follow` | `getLogs` (poll) |
-| **Best for** | Scripting, CI, bulk operations | Interactive AI agent sessions |
+| **Best for** | AI agents (pull project locally for full context) | Quick edits, scripts, automation |
 
 ### MCP Tool Reference
 
