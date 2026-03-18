@@ -135,6 +135,7 @@ Always prefer `--wait` over asking the user to manually switch to Codea first.
 | `codea ls` | List all projects as Collection/Project |
 | `codea new <name>` | Create a new project (see naming above); `--template <name>` selects a template (e.g. `Default`, `Modern`) |
 | `codea rename <project> <newname>` | Rename a project |
+| `codea move <project> <collection>` | Move a project to a different collection |
 | `codea delete <project>` | Delete a project (prompts for confirmation) |
 | `codea runtime <project>` | Get the runtime type (`legacy` or `modern`) |
 | `codea runtime <project> <type>` | Set the runtime type (`legacy` or `modern`) |

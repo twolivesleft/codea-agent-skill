@@ -76,19 +76,23 @@ def project(client, temp_collection):
     """Create a fresh project in the temp collection; delete it after the test."""
     name = f"test_{int(time.time() * 1000) % 1_000_000}"
     result = client.call_tool("createProject", {"name": name, "collection": temp_collection})
-    uri = _extract_uri(client.text(result))
+    path = _extract_path(client.text(result))
 
-    yield {"name": name, "uri": uri, "collection": temp_collection}
+    yield {"name": name, "uri": path, "collection": temp_collection}
 
     try:
-        client.call_tool("deleteProject", {"path": uri})
+        client.call_tool("deleteProject", {"path": path})
     except MCPError:
         pass  # best-effort
 
 
-def _extract_uri(text: str) -> str:
-    """Pull the codea:// URI out of a createProject response string."""
-    for word in text.split():
-        if word.startswith("codea://"):
-            return word
-    raise ValueError(f"No URI found in: {text!r}")
+def _extract_path(text: str) -> str:
+    """Pull the project path out of a createProject response string.
+
+    Handles 'Path: Collection/Project' format.
+    """
+    words = text.split()
+    for i, word in enumerate(words):
+        if word == "Path:" and i + 1 < len(words):
+            return words[i + 1]
+    raise ValueError(f"No path found in: {text!r}")

@@ -140,6 +140,7 @@ codea --wait run "Foo"   # wait for Codea, then run project
 | `codea ls` | List all projects as `Collection/Project` |
 | `codea new <name>` | Create a new project (supports `Collection/Project` notation); `--template <name>` selects a template |
 | `codea rename <project> <newname>` | Rename a project |
+| `codea move <project> <collection>` | Move a project to a different collection |
 | `codea delete <project>` | Delete a project (prompts for confirmation) |
 
 ### Templates

@@ -4,7 +4,6 @@ import sys
 import time
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlparse
 
 import click
 
@@ -48,49 +47,16 @@ def get_client(profile: str) -> MCPClient:
     return MCPClient(host, port)
 
 
-def uri_logical_path(uri: str) -> str:
-    """Extract logical path from codea:// URI.
-
-    Examples:
-      codea://host/Codea/Documents/Morse       -> "Documents/Morse"
-      codea://host/Codea/iCloud/Documents/Foo  -> "iCloud/Documents/Foo"
-    """
-    path = urlparse(uri).path  # /Codea/Documents/Morse
-    parts = path.strip("/").split("/")
-    return "/".join(parts[1:])  # drop leading "Codea"
+def project_name(path: str) -> str:
+    """Get the bare project name from a logical path like 'Documents/Morse' or 'iCloud/Documents/Foo'."""
+    return path.split("/")[-1]
 
 
-def find_project_uri(client: MCPClient, name: str) -> str:
-    """Find a project URI by name, with optional Collection/ or iCloud/Collection/ prefix."""
-    projects = client.list_projects()
-    name_lower = name.lower()
-
-    if "/" in name:
-        # Exact logical path match (e.g. "Documents/Morse" or "iCloud/Documents/Foo")
-        matches = [p for p in projects if uri_logical_path(p).lower() == name_lower]
-    else:
-        # Match by project name only
-        matches = [p for p in projects if uri_logical_path(p).split("/")[-1].lower() == name_lower]
-
-    if not matches:
-        available = [uri_logical_path(p) for p in projects]
-        raise click.ClickException(
-            f"Project '{name}' not found.\nAvailable projects: {', '.join(sorted(available))}"
-        )
-    if len(matches) > 1:
-        paths = [uri_logical_path(p) for p in matches]
-        raise click.ClickException(
-            f"Multiple projects named '{name}':\n" + "\n".join(paths) +
-            "\nUse Collection/Project notation to disambiguate (e.g. 'Documents/Morse')."
-        )
-    return matches[0]
-
-
-def pull_project_files(client: MCPClient, project_uri: str, output_dir: Path, files: tuple = (), label: str = ""):
-    """Pull files from a project URI into output_dir. If files is given, only pull those."""
+def pull_project_files(client: MCPClient, project_path: str, output_dir: Path, files: tuple = (), label: str = ""):
+    """Pull files from a project path into output_dir. If files is given, only pull those."""
     prefix = f"[{label}] " if label else ""
     try:
-        all_files = client.list_files(project_uri)
+        all_files = client.list_files(project_path)
     except MCPError as e:
         click.echo(f"{prefix}Warning: could not list files: {e}", err=True)
         return
@@ -101,11 +67,11 @@ def pull_project_files(client: MCPClient, project_uri: str, output_dir: Path, fi
         files_lower = {f.lower() for f in files}
         all_files = [f for f in all_files if f.rstrip("/").split("/")[-1].lower() in files_lower]
 
-    for file_uri in all_files:
-        filename = file_uri.rstrip("/").split("/")[-1]
+    for file_path in all_files:
+        filename = file_path.rstrip("/").split("/")[-1]
         local_path = output_dir / filename
         try:
-            content = client.read_file(file_uri)
+            content = client.read_file(file_path)
             local_path.write_text(content, encoding="utf-8")
             click.echo(f"{prefix}  {filename}")
         except MCPError as e:
@@ -239,8 +205,8 @@ def status(profile):
 def ls(profile):
     """List all projects on the device as Collection/Project."""
     client = get_client(profile)
-    for uri in client.list_projects():
-        click.echo(uri_logical_path(uri))
+    for path in client.list_projects():
+        click.echo(path)
 
 
 @main.command()
@@ -256,23 +222,22 @@ def pull(project, files, output, profile, no_deps):
     Optionally specify individual FILES to pull (e.g. Main.lua Player.lua).
     """
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    project_name = uri_logical_path(project_uri).split("/")[-1]
+    pname = project_name(project)
 
-    output_dir = Path(output) if output else Path(project_name)
+    output_dir = Path(output) if output else Path(pname)
 
     if files:
-        click.echo(f"Pulling {', '.join(files)} from '{project_name}' → {output_dir}/")
-        pull_project_files(client, project_uri, output_dir, files=files)
+        click.echo(f"Pulling {', '.join(files)} from '{pname}' → {output_dir}/")
+        pull_project_files(client, project, output_dir, files=files)
         click.echo("Done.")
         return
 
-    click.echo(f"Pulling '{project_name}' → {output_dir}/")
-    pull_project_files(client, project_uri, output_dir)
+    click.echo(f"Pulling '{pname}' → {output_dir}/")
+    pull_project_files(client, project, output_dir)
 
     if not no_deps:
         try:
-            deps = client.list_dependencies(project_uri)
+            deps = client.list_dependencies(project)
         except MCPError:
             deps = []
 
@@ -282,15 +247,14 @@ def pull(project, files, output, profile, no_deps):
 
             for dep in deps:
                 dep_name = dep.split(":")[-1]
-                dep_uri_matches = [
+                dep_matches = [
                     p for p in all_projects
-                    if uri_logical_path(p).split("/")[-1].lower() == dep_name.lower()
+                    if p.split("/")[-1].lower() == dep_name.lower()
                 ]
-                if dep_uri_matches:
-                    dep_uri = dep_uri_matches[0]
+                if dep_matches:
                     dep_dir = output_dir / "Dependencies" / dep_name
                     click.echo(f"Pulling dependency '{dep_name}' → {dep_dir}/")
-                    pull_project_files(client, dep_uri, dep_dir, label=dep_name)
+                    pull_project_files(client, dep_matches[0], dep_dir, label=dep_name)
                 else:
                     click.echo(f"  Dependency '{dep_name}' not found on device.", err=True)
 
@@ -309,21 +273,20 @@ def push(project, files, input_dir, profile):
     Optionally specify individual FILES to push (e.g. Main.lua Player.lua).
     """
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    project_name = uri_logical_path(project_uri).split("/")[-1]
+    pname = project_name(project)
 
-    source_dir = Path(input_dir) if input_dir else Path(project_name)
+    source_dir = Path(input_dir) if input_dir else Path(pname)
     if not source_dir.exists():
         raise click.ClickException(f"Directory '{source_dir}' does not exist.")
 
-    def push_file(local_path, file_uri, label):
+    def push_file(local_path, file_path, label):
         try:
             try:
                 content = local_path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 # Binary file: send as base64
                 content = base64.b64encode(local_path.read_bytes()).decode("ascii")
-            client.write_file(file_uri, content)
+            client.write_file(file_path, content)
             click.echo(f"  {label}")
         except MCPError as e:
             click.echo(f"  {label} (error: {e})", err=True)
@@ -334,12 +297,12 @@ def push(project, files, input_dir, profile):
             if not local_path.exists():
                 click.echo(f"  {filename} (not found, skipping)", err=True)
                 continue
-            file_uri = f"{project_uri}/{filename}"
-            push_file(local_path, file_uri, filename)
+            file_path = f"{project}/{filename}"
+            push_file(local_path, file_path, filename)
         click.echo("Done.")
         return
 
-    click.echo(f"Pushing '{source_dir}/' → '{project_name}' on device...")
+    click.echo(f"Pushing '{source_dir}/' → '{pname}' on device...")
 
     for local_path in sorted(source_dir.rglob("*")):
         if not local_path.is_file():
@@ -351,20 +314,20 @@ def push(project, files, input_dir, profile):
         if len(parts) >= 3 and parts[0] == "Dependencies":
             dep_name = parts[1]
             filename = "/".join(parts[2:])
-            dep_uri_matches = [
+            dep_matches = [
                 p for p in client.list_projects()
-                if uri_logical_path(p).split("/")[-1].lower() == dep_name.lower()
+                if p.split("/")[-1].lower() == dep_name.lower()
             ]
-            if dep_uri_matches:
-                file_uri = f"{dep_uri_matches[0]}/{filename}"
+            if dep_matches:
+                file_path = f"{dep_matches[0]}/{filename}"
             else:
                 click.echo(f"  Skipping {relative} (dependency not found)", err=True)
                 continue
         else:
             filename = "/".join(parts)
-            file_uri = f"{project_uri}/{filename}"
+            file_path = f"{project}/{filename}"
 
-        push_file(local_path, file_uri, str(relative))
+        push_file(local_path, file_path, str(relative))
 
     click.echo("Done.")
 
@@ -375,8 +338,7 @@ def push(project, files, input_dir, profile):
 def run(project, profile):
     """Run a Codea project on the device."""
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    result = client.run_project(project_uri)
+    result = client.run_project(project)
     click.echo(result)
 
 
@@ -555,8 +517,24 @@ def new(name, collection, cloud, template, profile):
 def rename(project, newname, profile):
     """Rename a Codea project on the device."""
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    result = client.call_tool("renameProject", {"path": project_uri, "newName": newname})
+    result = client.call_tool("renameProject", {"path": project, "newName": newname})
+    click.echo(client.text(result))
+
+
+@main.command()
+@click.argument("project")
+@click.argument("collection")
+@click.option("--profile", default="default", help="Device profile.")
+def move(project, collection, profile):
+    """Move a Codea project to a different collection.
+
+    PROJECT is the project name or Collection/Project.
+    COLLECTION is the destination collection name.
+
+    Example: codea move "Documents/MyGame" Examples
+    """
+    client = get_client(profile)
+    result = client.call_tool("moveProject", {"path": project, "collection": collection})
     click.echo(client.text(result))
 
 
@@ -566,11 +544,10 @@ def rename(project, newname, profile):
 def delete(project, profile):
     """Delete a Codea project from the device."""
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    project_name = uri_logical_path(project_uri).split("/")[-1]
-    if not click.confirm(f"Delete '{project_name}'? This cannot be undone."):
+    pname = project_name(project)
+    if not click.confirm(f"Delete '{pname}'? This cannot be undone."):
         return
-    result = client.call_tool("deleteProject", {"path": project_uri})
+    result = client.call_tool("deleteProject", {"path": project})
     click.echo(client.text(result))
 
 
@@ -639,8 +616,7 @@ def templates_ls(profile):
 def templates_add(project, name, profile):
     """Copy a project into the custom templates collection."""
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    args = {"path": project_uri}
+    args = {"path": project}
     if name:
         args["name"] = name
     result = client.call_tool("addTemplate", args)
@@ -673,8 +649,7 @@ def deps():
 def deps_ls(project, profile):
     """List dependencies of a project."""
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    for dep in client.list_dependencies(project_uri):
+    for dep in client.list_dependencies(project):
         click.echo(dep)
 
 
@@ -684,8 +659,7 @@ def deps_ls(project, profile):
 def deps_available(project, profile):
     """List projects available to add as dependencies."""
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    result = client.call_tool("listAvailableDependencies", {"path": project_uri})
+    result = client.call_tool("listAvailableDependencies", {"path": project})
     for dep in client.json_result(result):
         click.echo(dep)
 
@@ -697,8 +671,7 @@ def deps_available(project, profile):
 def deps_add(project, dependency, profile):
     """Add a dependency to a project."""
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    result = client.call_tool("addDependency", {"path": project_uri, "dependency": dependency})
+    result = client.call_tool("addDependency", {"path": project, "dependency": dependency})
     click.echo(client.text(result))
 
 
@@ -709,8 +682,7 @@ def deps_add(project, dependency, profile):
 def deps_remove(project, dependency, profile):
     """Remove a dependency from a project."""
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    result = client.call_tool("removeDependency", {"path": project_uri, "dependency": dependency})
+    result = client.call_tool("removeDependency", {"path": project, "dependency": dependency})
     click.echo(client.text(result))
 
 
@@ -727,8 +699,7 @@ def autocomplete(project, code, profile):
     Example: codea autocomplete "My Game" "asset."
     """
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
-    result = client.get_completions(project_uri, code)
+    result = client.get_completions(project, code)
     items = result.get("items", [])
     if not items:
         click.echo("(no completions)")
@@ -764,13 +735,12 @@ def runtime(project, type, profile):
       codea runtime "My Game" legacy    # switch to legacy
     """
     client = get_client(profile)
-    project_uri = find_project_uri(client, project)
     if type is None:
-        click.echo(client.get_runtime(project_uri))
+        click.echo(client.get_runtime(project))
     else:
         if type not in ("legacy", "modern"):
             raise click.ClickException("Runtime type must be 'legacy' or 'modern'.")
-        click.echo(client.set_runtime(project_uri, type))
+        click.echo(client.set_runtime(project, type))
 
 
 def _print_doc_section(title, doc):
@@ -850,8 +820,7 @@ def doc(function_name, filter_runtime, project, profile):
 
     # Resolve --project to a runtime filter (only if not already explicitly set)
     if project and not filter_runtime:
-        project_uri = find_project_uri(client, project)
-        filter_runtime = client.get_runtime(project_uri)
+        filter_runtime = client.get_runtime(project)
 
     result = client.get_function_help(function_name)
     modern = result.get("modern")
@@ -910,8 +879,7 @@ def search_doc(query, filter_runtime, project, profile):
     client = get_client(profile)
 
     if project and not filter_runtime:
-        project_uri = find_project_uri(client, project)
-        filter_runtime = client.get_runtime(project_uri)
+        filter_runtime = client.get_runtime(project)
 
     results = client.search_docs(query)
 

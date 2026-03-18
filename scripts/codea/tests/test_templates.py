@@ -21,10 +21,12 @@ def template_project(client, temp_collection):
     """A fresh project to use as a template source; cleaned up after the test."""
     name = f"tmplsrc_{int(time.time() * 1000) % 1_000_000}"
     result = client.call_tool("createProject", {"name": name, "collection": temp_collection})
-    uri = next(w for w in client.text(result).split() if w.startswith("codea://"))
-    yield {"name": name, "uri": uri, "collection": temp_collection}
+    text = client.text(result)
+    words = text.split()
+    path = next(words[i + 1] for i, w in enumerate(words) if w == "Path:" and i + 1 < len(words))
+    yield {"name": name, "uri": path, "collection": temp_collection}
     try:
-        client.call_tool("deleteProject", {"path": uri})
+        client.call_tool("deleteProject", {"path": path})
     except MCPError:
         pass
 
