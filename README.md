@@ -265,3 +265,108 @@ export CODEA_PORT=18513
 This tool ships with a `SKILL.md` file that AI coding assistants (Claude Code and others) automatically pick up as an agent skill. Once installed, agents can pull projects, edit code, push changes, run projects, and inspect results — all through the `codea` CLI.
 
 See `SKILL.md` for the agent-specific workflow documentation.
+
+---
+
+## MCP Server
+
+Codea's Air Code server also speaks the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), giving AI agents direct access to Codea without the CLI. MCP tools work on individual files in-place — no pull/push cycle needed.
+
+### Connecting via MCP
+
+Point your MCP client at the Air Code server:
+
+```
+http://<device-ip>:18513/mcp
+```
+
+For example, in Claude Code:
+
+```bash
+claude mcp add codea --transport http http://192.168.1.42:18513/mcp
+```
+
+### Choosing Between CLI and MCP
+
+| | CLI (`codea`) | MCP |
+|---|---|---|
+| **Works with** | Any terminal or agent via shell | MCP-compatible clients (Claude Code, Cursor, etc.) |
+| **File editing** | Pull locally → edit → push | Read/write files directly on device |
+| **Network scan** | `codea discover` | Configure host manually |
+| **Streaming logs** | `codea logs --follow` | `getLogs` (poll) |
+| **Best for** | Scripting, CI, bulk operations | Interactive AI agent sessions |
+
+### MCP Tool Reference
+
+#### Collections
+
+| Tool | Description |
+|------|-------------|
+| `listCollections` | List all collections. Returns logical paths like `Documents` (local) or `iCloud/Documents` (cloud). |
+| `createCollection` | Create a new local collection. |
+| `deleteCollection` | Delete a local collection. |
+
+#### Projects
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `listProjects` | — | List all projects on the device as logical paths (e.g. `Documents/MyProject`). |
+| `createProject` | `name`, `collection?`, `cloud?`, `template?` | Create a new project. `template` accepts names like `Default` or `Modern`. |
+| `deleteProject` | `path` | Delete a project. |
+| `renameProject` | `path`, `newName` | Rename a project. |
+| `moveProject` | `path`, `collection` | Move a project to a different collection. |
+| `getRuntime` | `path` | Get the runtime type (`legacy` or `modern`) for a project. |
+| `setRuntime` | `path`, `runtime` | Set the runtime type for a project. |
+
+#### Templates
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `listTemplates` | — | List all available templates (built-in and custom). |
+| `addTemplate` | `path`, `name?` | Copy a project into the custom templates collection. |
+| `removeTemplate` | `name` | Remove a custom template by name. |
+
+#### Files
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `listFiles` | `path` | List all files in a project. |
+| `readFile` | `path` | Read the contents of a file (e.g. `MyProject/Main.lua`). |
+| `writeFile` | `path`, `content` | Write content to a file; creates it if it doesn't exist. |
+| `deleteFile` | `path` | Delete a file from a project. |
+| `renameFile` | `path`, `newName` | Rename a file within a project. |
+| `copyFile` | `path`, `newName` | Copy a file within a project. |
+| `findInFiles` | `path`, `text`, `caseSensitive?`, `wholeWord?`, `isRegex?` | Search for text across all files in a project. |
+
+#### Runtime
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `runProject` | `path` | Run a project on the device. |
+| `stopProject` | — | Stop the currently running project. |
+| `restartProject` | — | Restart the currently running project. |
+| `executeLua` | `code` | Execute a Lua string in the running project. |
+| `captureScreenshot` | — | Capture a screenshot of the device screen as a PNG. |
+| `getDeviceState` | — | Get current state: running/idle, active project, idle timer, paused state. |
+| `getProjectPaused` | — | Check whether the running project is paused. |
+| `getIdleTimerDisabled` | — | Get the idle timer state (disabled = screen kept on). |
+| `setIdleTimerDisabled` | `disabled` | Enable or disable the idle timer. |
+| `getLogs` | `head?`, `tail?` | Get log output since the last `clearLogs`. Pass `head` or `tail` to limit lines. |
+| `clearLogs` | — | Clear the log buffer. |
+
+#### Dependencies
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `listDependencies` | `path` | List a project's current dependencies. |
+| `listAvailableDependencies` | `path` | List projects that can be added as dependencies. |
+| `addDependency` | `path`, `dependency` | Add a dependency to a project. |
+| `removeDependency` | `path`, `dependency` | Remove a dependency from a project. |
+
+#### Documentation & Autocomplete
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `getFunctionHelp` | `functionName` | Get full documentation for a Codea API function (e.g. `sprite`, `physics.body`). Includes legacy and modern signatures plus a `seeAlso` list. |
+| `searchDocs` | `query` | Search API docs by keyword across both runtimes. |
+| `getCompletions` | `path`, `code` | Get Lua autocomplete suggestions for a code prefix within a project. |
