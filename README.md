@@ -2,6 +2,8 @@
 
 A CLI tool that lets AI agents (and humans) control [Codea](https://codea.io) remotely over the network. It connects to Codea's built-in Air Code server and exposes project management, file editing, runtime control, and dependency management as simple shell commands — the same interface whether you're a human in a terminal or an AI agent in a tool call.
 
+An [MCP server](https://github.com/twolivesleft/codea-agent-skill?tab=readme-ov-file#mcp-server) is also available and used by the CLI tool.
+
 ## Requirements
 
 - Python 3.10+
