@@ -902,3 +902,5 @@ def search_doc(query, filter_runtime, project, profile):
             click.echo(f"  {name}  – {desc}  {tag}")
         else:
             click.echo(f"  {name}  {tag}")
+
+    click.echo("\nUse 'codea doc <function>' for complete documentation.")
