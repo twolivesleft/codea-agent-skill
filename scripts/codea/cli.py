@@ -796,6 +796,16 @@ def _print_doc_section(title, doc):
 
         click.echo()
 
+    examples = doc.get("examples", [])
+    if examples:
+        click.echo("Example:" if len(examples) == 1 else "Examples:")
+        for ex in examples:
+            if ex.get("title"):
+                click.echo(f"  {ex['title']}")
+            for line in ex.get("code", "").splitlines():
+                click.echo(f"    {line}")
+            click.echo()
+
 
 @main.command()
 @click.argument("function_name")
