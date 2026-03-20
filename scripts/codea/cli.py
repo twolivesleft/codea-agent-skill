@@ -857,6 +857,15 @@ def doc(function_name, filter_runtime, project, profile):
     if see_also:
         click.echo("See also: " + ", ".join(see_also))
 
+    modern_url = result.get("modernDocUrl")
+    legacy_url = result.get("legacyDocUrl")
+    if modern_url and legacy_url:
+        click.echo(f"\nDocs:\n  Modern: {modern_url}\n  Legacy: {legacy_url}")
+    elif modern_url:
+        click.echo(f"\nDocs: {modern_url}")
+    elif legacy_url:
+        click.echo(f"\nDocs: {legacy_url}")
+
 
 @main.command("search-doc")
 @click.argument("query")
