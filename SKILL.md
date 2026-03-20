@@ -268,6 +268,8 @@ Codea projects use one of two runtimes, stored as `Runtime Type` in `Info.plist`
 Use `codea runtime <project>` to check, and `codea runtime <project> modern` to switch.
 Use `codea doc <function> --project <name>` to get docs for the right runtime automatically.
 
+> **Important:** Do not switch the runtime by manually editing `Runtime Type` in `Info.plist`. The device caches project info in memory, so a pushed plist change is not picked up until `codea runtime` is used to update it on the device side.
+
 ## Codea API Documentation
 
 Use `codea doc <function>` to look up API documentation directly from the device — no browser needed. Always check docs before using an unfamiliar function. The output includes a "See also:" line listing sibling functions in the same group, which is useful for discovering related APIs without needing to know their names upfront.
