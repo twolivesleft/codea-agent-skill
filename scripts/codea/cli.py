@@ -904,7 +904,7 @@ def search_doc(query, filter_runtime, project, profile):
 
     for item in results:
         name = item.get("name", "")
-        raw_desc = item.get("description", "")
+        raw_desc = item.get("description", "").replace("\n", " ")
         desc = (raw_desc[:80] + "…") if len(raw_desc) > 80 else raw_desc
         runtime = item.get("runtime", "")
         tag = f"[{runtime}]" if runtime else ""
