@@ -84,7 +84,7 @@ cat /tmp/codea.log
 codea new "My Game"
 codea new "My Game" --collection Documents   # explicit collection
 codea new "My Game" --cloud                  # iCloud
-codea new "My Game" --template Modern        # use Modern (Carbide) template
+codea new "My Game" --template Modern        # use Modern (Carbide) template — also sets the runtime to modern; no need to run `codea runtime` separately
 
 # 2. Pull it locally — gets the default template files (Main.lua etc.)
 codea pull "My Game"
@@ -265,8 +265,10 @@ Codea projects use one of two runtimes, stored as `Runtime Type` in `Info.plist`
 | Legacy | `legacy` (or absent) | Codea 3.x APIs |
 | Modern | `modern` | Codea 4.x / Carbide APIs |
 
-Use `codea runtime <project>` to check, and `codea runtime <project> modern` to switch.
+Use `codea runtime <project>` to check, and `codea runtime <project> modern` to switch an existing project's runtime.
 Use `codea doc <function> --project <name>` to get docs for the right runtime automatically.
+
+> **Note:** When creating a new project with `codea new "My Game" --template Modern`, the runtime is automatically set to `modern` — there is no need to also run `codea runtime`. Use `codea runtime` only when changing the runtime of an already-existing project.
 
 > **Important:** Do not switch the runtime by manually editing `Runtime Type` in `Info.plist`. The device caches project info in memory, so a pushed plist change is not picked up until `codea runtime` is used to update it on the device side.
 
