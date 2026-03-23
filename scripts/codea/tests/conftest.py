@@ -58,7 +58,12 @@ def client(profile):
 def temp_collection(client):
     """Create a temporary collection for the test session; always delete it at the end."""
     name = f"_test_{int(time.time())}"
-    client.call_tool("createCollection", {"name": name})
+    try:
+        client.call_tool("createCollection", {"name": name})
+    except MCPError as e:
+        if "Projects unavailable" in str(e):
+            pytest.skip("Current Codea target does not support project repository operations.")
+        raise
     yield name
     # Cleanup — runs even if tests fail
     try:
@@ -75,7 +80,12 @@ def temp_collection(client):
 def project(client, temp_collection):
     """Create a fresh project in the temp collection; delete it after the test."""
     name = f"test_{int(time.time() * 1000) % 1_000_000}"
-    result = client.call_tool("createProject", {"name": name, "collection": temp_collection})
+    try:
+        result = client.call_tool("createProject", {"name": name, "collection": temp_collection})
+    except MCPError as e:
+        if "Projects unavailable" in str(e):
+            pytest.skip("Current Codea target does not support project repository operations.")
+        raise
     path = _extract_path(client.text(result))
 
     yield {"name": name, "uri": path, "collection": temp_collection}

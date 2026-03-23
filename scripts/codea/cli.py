@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -183,6 +184,7 @@ def status(profile):
         state = client.get_device_state()
         project_state = state.get("state", "none")
         project_name = state.get("project")
+        local_path = state.get("localPath")
         idle_disabled = state.get("idleTimerDisabled", False)
         paused = state.get("paused")
 
@@ -194,6 +196,9 @@ def status(profile):
             click.echo(f"State:   {label}")
         else:
             click.echo("State:   No project running")
+
+        if local_path:
+            click.echo(f"Local path: {local_path}")
 
         click.echo(f"Idle timer: {'off (screen stays on)' if idle_disabled else 'on'}")
     except Exception:
@@ -480,16 +485,18 @@ def clear_logs(profile):
 @click.option("--collection", default=None, help="Collection to create in (default: first available).")
 @click.option("--cloud", is_flag=True, help="Create in iCloud.")
 @click.option("--template", default=None, help="Template name for the new project (e.g. Default, Modern).")
+@click.option("--folder", is_flag=True, help="For local hosts, create a plain folder instead of a .codea bundle.")
 @click.option("--profile", default="default", help="Device profile.")
-def new(name, collection, cloud, template, profile):
+def new(name, collection, cloud, template, folder, profile):
     """Create a new Codea project on the device.
 
     NAME can be just a project name or Collection/Project to specify a collection.
     """
     client = get_client(profile)
+    is_filesystem_style_name = name.startswith((".", "/", "~"))
 
     # Parse slash notation: "Documents/MyProject" or "iCloud/Documents/MyProject"
-    if "/" in name and collection is None:
+    if "/" in name and collection is None and not is_filesystem_style_name:
         parts = name.split("/")
         if parts[0].lower() == "icloud":
             cloud = True
@@ -505,6 +512,20 @@ def new(name, collection, cloud, template, profile):
         args["cloud"] = True
     if template is not None:
         args["template"] = template
+    if not collection and not cloud:
+        looks_like_fs_path = is_filesystem_style_name or os.sep in name
+        if looks_like_fs_path:
+            expanded = Path(name).expanduser()
+            local_path = expanded if expanded.is_absolute() else Path.cwd() / expanded
+        else:
+            local_path = Path.cwd() / name
+
+        if not folder and local_path.suffix.lower() != ".codea":
+            local_path = local_path.with_suffix(".codea")
+
+        args["path"] = str(local_path.resolve())
+    if folder:
+        args["folder"] = True
 
     result = client.call_tool("createProject", args)
     click.echo(client.text(result))
