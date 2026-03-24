@@ -318,6 +318,48 @@ Asset strings using the `Project:Asset` format (e.g., `readImage("Blobbo:empty")
 ### Missing `roundRect`
 The `roundRect` function is not built-in to the Codea runtime. If your project requires rounded rectangles, you must implement the function yourself (e.g., using `mesh` or drawing multiple `rect` and `ellipse` calls).
 
+---
+
+## Modern Runtime (Carbide) Gotchas
+
+### Text and Emojis
+Emojis render as empty boxes with the default text renderer. To display emojis correctly, use `TEXT_NATIVE`:
+```lua
+style.push().textStyle(TEXT_NATIVE)
+text("🎉 🚀 ❤️", x, y)
+style.pop()
+```
+Note: `TEXT_NATIVE` uses the system font renderer; other `textStyle` flags (bold, italic, rich text, etc.) are ignored while it is active.
+
+### 3D Coordinate System
+Codea 4.x uses a **left-handed, +Z-forward** coordinate system (Metal convention). Objects must be at **positive Z** to be visible:
+```lua
+matrix.push()
+    matrix.perspective(60)      -- camera at origin, looking toward +Z
+    matrix.translate(0, 0, 4)   -- place object in front (positive Z)
+    myMesh:draw()
+matrix.pop()
+-- Always wrap 3D in push/pop to restore 2D state afterwards
+```
+
+### Mesh: `vertices` vs `positions`
+For custom mesh geometry, use `mesh.vertices = {...}` (not `mesh.positions`). `vertices` auto-sets the index buffer so the mesh draws immediately. `positions` leaves the index buffer untouched — useful for deforming an existing mesh, but on a fresh empty mesh nothing will be drawn.
+
+### Mesh Lighting and Materials
+Generated meshes (`mesh.sphere()`, `mesh.box()`, etc.) render **black** by default — they need a material or a light:
+- **Unlit with color** (no light needed): `m.material = material.unlit(); m.material.color = color(r,g,b)`
+- **Lit with shading**: `m.material = material.lit(); m.material.color = color(r,g,b)` + a directional light
+
+Only `light.directional()` is currently supported in immediate mode — `light.point()` and `light.spot()` are defined but not yet implemented by the renderer.
+
+Use `light.push(lt)` / `light.pop()` as **static functions**, not methods:
+```lua
+local lt = light.directional(vec3(1, -1, 1))
+light.push(lt)
+myMesh:draw()
+light.pop()
+```
+
 ## Notes for Agents
 
 - Always `pull` before editing to get the latest files from device
