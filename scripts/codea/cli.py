@@ -796,6 +796,16 @@ def _print_doc_section(title, doc):
 
         click.echo()
 
+    examples = doc.get("examples", [])
+    if examples:
+        click.echo("Example:" if len(examples) == 1 else "Examples:")
+        for ex in examples:
+            if ex.get("title"):
+                click.echo(f"  {ex['title']}")
+            for line in ex.get("code", "").splitlines():
+                click.echo(f"    {line}")
+            click.echo()
+
 
 @main.command()
 @click.argument("function_name")
@@ -857,6 +867,15 @@ def doc(function_name, filter_runtime, project, profile):
     if see_also:
         click.echo("See also: " + ", ".join(see_also))
 
+    modern_url = result.get("modernDocUrl")
+    legacy_url = result.get("legacyDocUrl")
+    if modern_url and legacy_url:
+        click.echo(f"\nDocs:\n  Modern: {modern_url}\n  Legacy: {legacy_url}")
+    elif modern_url:
+        click.echo(f"\nDocs: {modern_url}")
+    elif legacy_url:
+        click.echo(f"\nDocs: {legacy_url}")
+
 
 @main.command("search-doc")
 @click.argument("query")
@@ -895,10 +914,13 @@ def search_doc(query, filter_runtime, project, profile):
 
     for item in results:
         name = item.get("name", "")
-        desc = item.get("description", "")
+        raw_desc = item.get("description", "").replace("\n", " ")
+        desc = (raw_desc[:80] + "…") if len(raw_desc) > 80 else raw_desc
         runtime = item.get("runtime", "")
         tag = f"[{runtime}]" if runtime else ""
         if desc:
             click.echo(f"  {name}  – {desc}  {tag}")
         else:
             click.echo(f"  {name}  {tag}")
+
+    click.echo("\nUse 'codea doc <function>' for complete documentation.")
