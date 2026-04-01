@@ -7,48 +7,137 @@ description: Control Codea on a connected iOS, iPadOS, or macOS device. Use this
 
 This directory contains the `codea` CLI tool for working with Codea projects on a connected iOS, iPadOS, or macOS device.
 
+The most important distinction is the target type:
+
+- `Project storage = filesystem`
+  Use the local filesystem workflow. This is the macOS Codea / Carbide case. Edit files directly on disk and `run` the project by path. Do not use `pull` / `push` unless you specifically need them for some other reason.
+- `Project storage = collections`
+  Use the repository workflow. This is the iOS / iPadOS Codea case. Pull projects from the device, edit locally, then push changes back.
+
 ## Setup
 
+Check whether the CLI is already installed:
+
 ```bash
-pip install -e .
-codea discover        # find device on local network and save config
+codea --help
 ```
 
-Or configure manually:
+### Install if neded
+
+For macOS, Linux, or WSL
+
 ```bash
+brew install twolivesleft/tap/codea
+```
+
+For Windows via PowerShell
+```powershell
+powershell -c "irm https://github.com/twolivesleft/codea-cli/releases/latest/download/codea-cli-installer.ps1 | iex"
+```
+
+### Configuration
+
+Connect to a target:
+
+```bash
+codea discover
 codea configure --host 192.168.1.42 --port 18513
 ```
 
-Or via environment variables (useful in CI or when config file isn't set up):
+Clear a saved device profile when you want to go back to local-only behavior:
+
+```bash
+codea configure --clear
+```
+
+Or use environment variables:
+
 ```bash
 export CODEA_HOST=192.168.1.42
 export CODEA_PORT=18513
 ```
 
-## Project Naming
+The CLI also performs a cached once-per-day update check by default. Set `CODEA_NO_UPDATE_CHECK=1` to disable it.
 
-Projects are identified as `Collection/Project` (e.g. `Documents/Morse`) or just `Project` if the name is unique across all collections. iCloud projects use `iCloud/Collection/Project`.
+If `codea` is not on `PATH`, use `./target/debug/codea ...`.
+
+## Determine The Target Type
+
+Before choosing a workflow, query the current target state and check `Project storage`.
 
 ```bash
-codea pull "Morse"                  # unique name, works as-is
-codea pull "Documents/Morse"        # explicit local collection
-codea pull "iCloud/Documents/Foo"   # iCloud project
+codea status
+```
+
+- If `Project storage` is `filesystem`, the target is a local macOS app and projects live directly on disk.
+- If `Project storage` is `collections`, the target is using Codea's project repository model and projects should be accessed through `pull` / `push`.
+
+Also pay attention to `Project path` when present. This is the canonical running project identifier:
+
+- `Examples/Flappy` or `iCloud/Documents/Foo` for collection-backed targets
+- `/path/to/MyGame.codea` for filesystem-backed targets
+
+## Project Naming
+
+Collection-backed projects are identified as `Collection/Project` or just `Project` if the name is unique:
+
+```bash
+codea pull "Morse"
+codea pull "Documents/Morse"
+codea pull "iCloud/Documents/Foo"
+```
+
+Filesystem-backed targets are usually addressed by local path:
+
+```bash
+codea run /path/to/MyGame.codea
+codea run /path/to/MyGame
 ```
 
 ## Typical Agent Workflow
 
-Always disable the idle timer at the start of a session so the device screen stays awake:
+Always disable the idle timer at the start of a device session so the target stays awake:
 
 ```bash
 codea idle-timer off
 ```
 
-### Editing an existing project
+### Filesystem-backed workflow (`projectStorage = filesystem`)
+
+Use this for local macOS Codea / Carbide targets.
 
 ```bash
-# 1. Pull a project and all its dependencies
+# 1. Work directly in the project directory
+cd /path/to/MyGame.codea
+
+# 2. Read and edit files with normal filesystem tools
+
+# 3. Run the project by path
+codea clear-logs
+codea logs --follow >> /tmp/codea.log &
+codea run /path/to/MyGame.codea
+sleep 2
+codea screenshot --output result.png
+
+# 4. Inspect runtime state
+codea exec "print(WIDTH, HEIGHT)"
+cat /tmp/codea.log
+
+# 5. Iterate by editing files on disk, then restart or run again
+codea restart
+```
+
+For filesystem-backed targets, `push` and `pull` are normally unnecessary because the agent can already access the same files directly.
+
+### Collection-backed workflow (`projectStorage = collections`)
+
+Use this for iPhone / iPad Codea targets.
+
+```bash
+# 1. Pull the project and its dependencies
 codea pull "My Game"
-# Files land in ./My Game/ and ./My Game/Dependencies/<name>/
+# Skip dependencies only if you explicitly do not need them
+codea pull "My Game" --no-deps
 
 # 2. Read and edit files (use standard file tools)
 
@@ -57,7 +146,7 @@ codea push "My Game" Main.lua Player.lua
 # Push entire project only if you don't know which files changed
 codea push "My Game"
 
-# 4. Start log monitoring, then run
+# 4. Start logs, run, and inspect
 codea clear-logs
 codea logs --follow >> /tmp/codea.log &
 codea run "My Game"
@@ -70,7 +159,7 @@ codea exec "print(health)"
 # 6. Check logs
 cat /tmp/codea.log
 
-# 7. Iterate (push changes, restart, check logs again)
+# 7. Iterate
 codea push "My Game" Main.lua
 codea restart
 sleep 2
@@ -79,26 +168,36 @@ cat /tmp/codea.log
 
 ### Creating a new project
 
+`codea new` is target-aware:
+
+- On filesystem-backed targets it creates a local project on disk.
+- On collection-backed targets it creates a project in the target repository.
+- If a saved device is unreachable, `codea new` falls back to local creation after a short probe unless `--wait` is set.
+- For local creation, only the `Modern` template is supported.
+
+Examples:
+
 ```bash
-# 1. Create the project on the device
 codea new "My Game"
-codea new "My Game" --collection Documents   # explicit collection
-codea new "My Game" --cloud                  # iCloud
-codea new "My Game" --template Modern        # use Modern (Carbide) template — also sets the runtime to modern; no need to run `codea runtime` separately
-
-# 2. Pull it locally — gets the default template files (Main.lua etc.)
-codea pull "My Game"
-
-# 3. Edit files locally (use standard file tools)
-
-# 4. Push back and run
-codea push "My Game"
-codea run "My Game"
-sleep 3
-codea screenshot --output result.png
+codea new "My Game" --local
+codea new "My Game" --folder
+codea new "My Game" --template Modern
+codea new "Documents/My Game"
+codea new "iCloud/Documents/My Game"
 ```
 
-## Global Flag: --wait
+After creation:
+
+- On filesystem-backed targets, edit the created directory directly and `run` it by path.
+- On collection-backed targets, `pull` it locally, edit, `push`, then `run`.
+
+Use these overrides when needed:
+
+- `codea new --local` forces local creation without probing the configured device.
+- `codea --wait new ...` keeps waiting for the configured device instead of falling back.
+- `codea configure --clear` forgets the saved device configuration.
+
+## Global Flag: `--wait`
 
 ```bash
 codea --wait <command>
@@ -109,6 +208,7 @@ Blocks until Codea's Air Code server responds, then runs the command. Use this w
 ```bash
 codea --wait ls
 codea --wait run "My Game"
+codea --wait run /path/to/MyGame.codea
 ```
 
 Always prefer `--wait` over asking the user to manually switch to Codea first.
@@ -118,8 +218,8 @@ Always prefer `--wait` over asking the user to manually switch to Codea first.
 ### Device
 | Command | Description |
 |---------|-------------|
-| `codea discover` | Scan network for Codea devices, save config |
-| `codea configure` | Manually set device host/port |
+| `codea discover` | Scan the local network for Codea devices and save config |
+| `codea configure` | Manually set device host/port, or `--clear` the saved profile |
 | `codea status` | Show current device config and live state |
 
 ### Collections
@@ -132,75 +232,109 @@ Always prefer `--wait` over asking the user to manually switch to Codea first.
 ### Projects
 | Command | Description |
 |---------|-------------|
-| `codea ls` | List all projects as Collection/Project |
-| `codea new <name>` | Create a new project (see naming above); `--template <name>` selects a template (e.g. `Default`, `Modern`) |
+| `codea ls` | List all projects as `Collection/Project` |
+| `codea new <name>` | Create a new project; local or remote depending on `projectStorage`, with `--local` to force local creation |
 | `codea rename <project> <newname>` | Rename a project |
-| `codea move <project> <collection>` | Move a project to a different collection |
+| `codea move <project> <collection>` | Move a project |
 | `codea delete <project>` | Delete a project (prompts for confirmation) |
-| `codea runtime <project>` | Get the runtime type (`legacy` or `modern`) |
-| `codea runtime <project> <type>` | Set the runtime type (`legacy` or `modern`) |
-
-### Templates
-| Command | Description |
-|---------|-------------|
-| `codea templates ls` | List all templates (built-in and custom) |
-| `codea templates add <project>` | Copy a project into the custom templates collection; `--name <name>` to rename |
-| `codea templates remove <name>` | Remove a custom template (prompts for confirmation) |
-
-Custom templates live in the `Templates` collection and appear in `codea ls` as `Templates/<name>`. They can be edited like any project — use `codea pull "Templates/My Template"` to pull locally, edit files, then `codea push "Templates/My Template"` to update the template.
+| `codea runtime <project>` | Get runtime type |
+| `codea runtime <project> <type>` | Set runtime type |
 
 ### Files
 | Command | Description |
 |---------|-------------|
-| `codea pull <project> [files...]` | Pull project + dependencies locally; optionally pull specific files |
-| `codea push <project> [files...]` | Push files back to device; omit files to push everything |
+| `codea pull <project> [files...]` | Pull project files locally; also pulls dependencies unless `--no-deps` is used |
+| `codea push <project> [files...]` | Push files back to the target |
 
 ### Runtime
 | Command | Description |
 |---------|-------------|
-| `codea run <project>` | Start a project |
+| `codea run <project-or-path>` | Start a project by repository name or filesystem path |
 | `codea stop` | Stop the running project |
 | `codea restart` | Restart the running project |
 | `codea exec "<lua>"` | Execute Lua in the running project |
-| `codea exec --file <path>` | Execute the contents of a Lua file in the running project |
+| `codea exec --file <path>` | Execute a Lua file |
 | `codea pause` | Pause the running project |
-| `codea resume` | Resume the paused project |
-| `codea paused` | Check whether the running project is paused |
-| `codea paused <on\|off>` | Pause or unpause the running project |
-| `codea screenshot` | Save screenshot as PNG |
-| `codea idle-timer` | Check current idle timer state |
-| `codea idle-timer <on\|off>` | Enable or disable the idle timer (`off` keeps the screen awake) |
-| `codea logs` | Get all log output since last clear |
-| `codea logs --head N` | Get first N lines (useful when an early error causes spam) |
+| `codea resume` | Resume the running project |
+| `codea paused [on\|off]` | Get or set paused state |
+| `codea screenshot [--output <file>]` | Capture a screenshot |
+| `codea idle-timer <on\|off>` | Get or set idle timer |
+| `codea logs` | Get log output |
+| `codea logs --head N` | Get first N lines |
 | `codea logs --tail N` | Get last N lines |
-| `codea logs --follow` | Stream new log lines in real time (Ctrl-C to stop) |
+| `codea logs --follow` | Stream logs in real time |
 | `codea clear-logs` | Clear the log buffer |
+
+### Templates
+| Command | Description |
+|---------|-------------|
+| `codea templates ls` | List all templates |
+| `codea templates add <project>` | Add a custom template |
+| `codea templates remove <name>` | Remove a custom template (prompts for confirmation) |
+
+Custom templates are part of the collection-backed workflow. They live in the `Templates` collection and can be edited like normal projects:
+
+```bash
+codea templates add "Documents/My Game" --name "My Template"
+codea pull "Templates/My Template"
+# edit files locally
+codea push "Templates/My Template"
+```
+
+On filesystem-backed targets, local project creation does not use the remote templates collection. For local `codea new`, only the built-in `Modern` project layout is supported.
 
 ### Dependencies
 | Command | Description |
 |---------|-------------|
 | `codea deps ls <project>` | List project dependencies |
-| `codea deps available <project>` | List projects that can be added as dependencies |
+| `codea deps available <project>` | List addable dependencies |
 | `codea deps add <project> <dependency>` | Add a dependency |
 | `codea deps remove <project> <dependency>` | Remove a dependency |
 
 ### Documentation
 | Command | Description |
 |---------|-------------|
-| `codea autocomplete <project> <code>` | Get Lua autocomplete suggestions for a code prefix (e.g. `"asset."`) |
-| `codea doc <function>` | Look up API documentation for a function (shows both runtimes); includes a "See also" list of related functions |
-| `codea doc <function> --modern` | Show only modern (Carbide) documentation |
-| `codea doc <function> --legacy` | Show only legacy documentation |
-| `codea doc <function> --project <name>` | Auto-select docs based on the project's runtime |
-| `codea search-doc <query>` | Search API docs by keyword; returns matching function names, descriptions, and `[modern]`/`[legacy]`/`[both]` tags |
-| `codea search-doc <query> --modern` | Show only modern (Carbide) results |
-| `codea search-doc <query> --legacy` | Show only legacy results |
-| `codea search-doc <query> --project <name>` | Auto-select runtime based on the project's runtime type |
+| `codea autocomplete <project> <code>` | Get completions for a Lua prefix |
+| `codea doc <function>` | Show API docs for the current runtime context; defaults to the running project's runtime, otherwise `modern` |
+| `codea doc <function> --all` | Show both modern and legacy docs |
+| `codea doc <function> --modern` | Show modern docs only |
+| `codea doc <function> --legacy` | Show legacy docs only |
+| `codea doc <function> --project <name-or-path>` | Filter docs by that project's runtime |
+| `codea doc <function> --project` | Filter docs by the currently running project's runtime |
+| `codea search-doc <query>` | Search docs for the current runtime context; defaults to the running project's runtime, otherwise `modern` |
+| `codea search-doc <query> --all` | Search both modern and legacy docs |
+| `codea search-doc <query> --modern` | Search modern docs only |
+| `codea search-doc <query> --legacy` | Search legacy docs only |
+| `codea search-doc <query> --project <name-or-path>` | Search docs using that project's runtime |
+| `codea search-doc <query> --project` | Search docs using the currently running project's runtime |
+
+When `--all` is given, `doc` and `search-doc` return both modern and legacy entries.
+
+When no runtime flags are given, `doc` and `search-doc` resolve runtime in this order:
+
+1. `--project <name-or-path>`
+2. bare `--project` using the currently running project
+3. the currently running project's runtime automatically
+4. `modern` if no project is running
+
+On filesystem-backed macOS targets, runtime should be treated as `modern`.
+
+When creating a new project with `codea new "My Game" --template Modern`, the runtime is already set to `modern`.
+
+To change the runtime of an existing collection-backed project, use:
+
+```bash
+codea runtime "My Game" modern
+codea runtime "My Game" legacy
+```
+
+Do not rely on manually editing `Runtime Type` in `Info.plist` for device-backed projects. Use `codea runtime` so the target updates its runtime state correctly.
 
 ## Pull / Push Details
 
 `codea pull "My Game"` creates:
-```
+
+```text
 My Game/
   Main.lua
   Player.lua
@@ -210,76 +344,36 @@ My Game/
       Physics.lua
 ```
 
-`codea push "My Game"` pushes all files in `./My Game/` back, routing
-`Dependencies/<name>/` files to the correct project on the device.
+`codea push "My Game"` pushes all files in `./My Game/` back, routing `Dependencies/<name>/` files to the correct project on the target.
 
-Use `--output <dir>` with pull and `--input <dir>` with push to specify a custom directory.
+Use `--output <dir>` with pull and `--input <dir>` with push to specify custom directories.
 
-## File Loading Order (Info.plist)
+## File Loading Order (`Info.plist`)
 
-Each Codea project contains an `Info.plist` file. The `Buffer Order` key in this file is an array of strings that defines the order in which Lua files are loaded by the runtime.
+Each Codea project contains an `Info.plist` file. The `Buffer Order` array defines the file load order. When adding new `.lua` files, update `Info.plist` and either push it back to the collection-backed target or keep it correct in the local project directory on filesystem-backed targets.
 
-```xml
-<key>Buffer Order</key>
-<array>
-    <string>Main</string>
-    <string>ClassA</string>
-    <string>ClassB</string>
-</array>
-```
+## Log Monitoring with `--follow`
 
-Managing this order is critical in several scenarios:
-- **Global Variables**: Any global variables or constants must be defined in a file that is loaded *before* they are used by other files.
-- **Class Inheritance**: Base classes must be loaded before any derived classes that inherit from them.
-- **Initialization**: Logic that expects certain systems to be initialized globally should be ordered appropriately.
-
-When creating a new project with `codea new` and pulling it locally, the `Buffer Order` will typically only contain `Main`. As you add new `.lua` files to the project, you **must** update the `Buffer Order` in `Info.plist` and push the changes back to the device to ensure the project runs correctly.
-
-## Log Monitoring with --follow
-
-The recommended pattern for monitoring logs while working is to start a background log stream before running the project:
+The recommended pattern is:
 
 ```bash
 codea clear-logs
 codea logs --follow >> /tmp/codea.log &
 codea run "My Game"
 
-# ... edit files, push changes, take screenshots ...
-
-cat /tmp/codea.log          # check all logs at any point
-tail -n 20 /tmp/codea.log   # check recent output
+cat /tmp/codea.log
+tail -n 20 /tmp/codea.log
 ```
 
-This keeps `/tmp/codea.log` continuously updated so you can inspect it at any time without missing output between polls. Kill the background process when done:
+For filesystem-backed targets, replace `"My Game"` with a local path as needed.
 
+Kill the background stream when done:
 ```bash
-kill %1   # or: pkill -f "codea logs --follow"
+kill %1
 ```
 
-## Runtime Types
-
-Codea projects use one of two runtimes, stored as `Runtime Type` in `Info.plist`:
-
-| Type | `Info.plist` value | Description |
-|------|--------------------|-------------|
-| Legacy | `legacy` (or absent) | Codea 3.x APIs |
-| Modern | `modern` | Codea 4.x / Carbide APIs |
-
-Use `codea runtime <project>` to check, and `codea runtime <project> modern` to switch an existing project's runtime.
-Use `codea doc <function> --project <name>` to get docs for the right runtime automatically.
-
-> **Note:** When creating a new project with `codea new "My Game" --template Modern`, the runtime is automatically set to `modern` — there is no need to also run `codea runtime`. Use `codea runtime` only when changing the runtime of an already-existing project.
-
-> **Important:** Do not switch the runtime by manually editing `Runtime Type` in `Info.plist`. The device caches project info in memory, so a pushed plist change is not picked up until `codea runtime` is used to update it on the device side.
-
-## Codea API Documentation
-
-Use `codea doc <function>` to look up API documentation directly from the device — no browser needed. Always check docs before using an unfamiliar function. The output includes a "See also:" line listing sibling functions in the same group, which is useful for discovering related APIs without needing to know their names upfront.
-
-Use `codea search-doc <query>` when you don't know the exact function name — it searches across names, descriptions, and help text in both runtimes and returns a list of matches.
-
 ```bash
-codea doc background                        # show all available docs (legacy + modern)
+codea doc background --all                  # show all available docs (legacy + modern)
 codea doc background --project "My Game"    # show only what's relevant to the project
 codea doc background --modern               # force modern (Carbide) docs
 codea doc background --legacy               # force legacy docs
