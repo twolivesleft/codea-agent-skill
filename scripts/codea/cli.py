@@ -1,5 +1,7 @@
 import base64
 import json
+import os
+import plistlib
 import sys
 import time
 from pathlib import Path
@@ -76,6 +78,64 @@ def pull_project_files(client: MCPClient, project_path: str, output_dir: Path, f
             click.echo(f"{prefix}  {filename}")
         except MCPError as e:
             click.echo(f"{prefix}  {filename} (error: {e})", err=True)
+
+
+MODERN_MAIN_LUA = """-- Modern\n\n-- Use this function to perform your initial setup\nfunction setup()\n    print(\"Hello World!\")\nend\n\n-- This function gets called once every frame\nfunction draw()\n    -- This sets a dark background color \n    background(40, 40, 50)\n\n    -- This sets the line thickness\n    style.strokeWidth(5)\n\n    -- Do your drawing here\n    \nend\n"""
+
+MODERN_INFO_PLIST = {
+    "Buffer Order": ["Main"],
+    "Runtime Type": "modern",
+}
+
+
+def _resolve_project_storage(profile: str) -> str:
+    config = load_config(profile)
+    if not config.get("host"):
+        return "filesystem"
+
+    try:
+        return get_client(profile).get_device_state().get("projectStorage", "collections")
+    except Exception:
+        return "filesystem"
+
+
+def _resolve_local_project_path(name: str, folder: bool) -> Path:
+    path = Path(name).expanduser()
+    if not path.is_absolute():
+        path = Path.cwd() / path
+
+    resolved = path.resolve()
+    if folder or resolved.suffix.lower() == ".codea":
+        return resolved
+    return resolved.with_suffix(".codea")
+
+
+def _ensure_empty_project_directory(destination: Path) -> None:
+    if destination.exists():
+        if not destination.is_dir():
+            raise click.ClickException(f"Destination already exists and is not a directory: {destination}")
+        visible_contents = [child for child in destination.iterdir() if child.name not in {".DS_Store"}]
+        if visible_contents:
+            raise click.ClickException(f"Destination already exists and is not empty: {destination}")
+    else:
+        destination.mkdir(parents=True, exist_ok=True)
+
+
+def _validate_local_template(template: Optional[str]) -> None:
+    if template and template.strip().lower() != "modern":
+        raise click.ClickException("Only the Modern template is supported for local project creation.")
+
+
+def _create_local_project(name: str, template: Optional[str], folder: bool) -> Path:
+    _validate_local_template(template)
+    destination = _resolve_local_project_path(name, folder)
+    _ensure_empty_project_directory(destination)
+
+    (destination / "Main.lua").write_text(MODERN_MAIN_LUA, encoding="utf-8")
+    with (destination / "Info.plist").open("wb") as f:
+        plistlib.dump(MODERN_INFO_PLIST, f)
+
+    return destination
 
 
 # --- CLI ---
@@ -183,6 +243,7 @@ def status(profile):
         state = client.get_device_state()
         project_state = state.get("state", "none")
         project_name = state.get("project")
+        local_path = state.get("localPath")
         idle_disabled = state.get("idleTimerDisabled", False)
         paused = state.get("paused")
 
@@ -194,6 +255,9 @@ def status(profile):
             click.echo(f"State:   {label}")
         else:
             click.echo("State:   No project running")
+
+        if local_path:
+            click.echo(f"Local path: {local_path}")
 
         click.echo(f"Idle timer: {'off (screen stays on)' if idle_disabled else 'on'}")
     except Exception:
@@ -480,13 +544,29 @@ def clear_logs(profile):
 @click.option("--collection", default=None, help="Collection to create in (default: first available).")
 @click.option("--cloud", is_flag=True, help="Create in iCloud.")
 @click.option("--template", default=None, help="Template name for the new project (e.g. Default, Modern).")
+@click.option("--folder", is_flag=True, help="For local creation, create a plain folder instead of a .codea bundle.")
 @click.option("--profile", default="default", help="Device profile.")
-def new(name, collection, cloud, template, profile):
-    """Create a new Codea project on the device.
+def new(name, collection, cloud, template, folder, profile):
+    """Create a new Codea project.
 
-    NAME can be just a project name or Collection/Project to specify a collection.
+    NAME can be a local project path or Collection/Project for collection-backed targets.
     """
+    project_storage = _resolve_project_storage(profile)
+
+    if project_storage == "filesystem":
+        if collection:
+            raise click.ClickException("--collection is only supported for collection-backed targets.")
+        if cloud:
+            raise click.ClickException("--cloud is only supported for collection-backed targets.")
+
+        destination = _create_local_project(name, template, folder)
+        click.echo(f"Created project '{destination.stem}'. Path: {destination}")
+        return
+
     client = get_client(profile)
+    args = {"name": name}
+    if template is not None:
+        args["template"] = template
 
     # Parse slash notation: "Documents/MyProject" or "iCloud/Documents/MyProject"
     if "/" in name and collection is None:
@@ -497,14 +577,14 @@ def new(name, collection, cloud, template, profile):
         if len(parts) >= 2:
             collection = "/".join(parts[:-1])
             name = parts[-1]
+            args["name"] = name
 
-    args = {"name": name}
     if collection:
         args["collection"] = collection
     if cloud:
         args["cloud"] = True
-    if template is not None:
-        args["template"] = template
+    if folder:
+        raise click.ClickException("--folder is only supported for local filesystem-backed targets.")
 
     result = client.call_tool("createProject", args)
     click.echo(client.text(result))

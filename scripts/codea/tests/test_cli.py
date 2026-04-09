@@ -5,11 +5,14 @@ options like --output, --input, --no-deps, specific file pull/push,
 and log filtering (--head, --tail, --follow).
 """
 
+import json
+import tempfile
 import threading
 import time
 import pytest
 from click.testing import CliRunner
 from pathlib import Path
+from unittest.mock import patch
 
 from codea.cli import main
 
@@ -199,3 +202,145 @@ def test_logs_follow(runner, client, running_project):
 
     assert len(received) >= 1
     assert any("first_line" in line or "spam" in line for line in received)
+
+
+# ---------------------------------------------------------------------------
+# status
+# ---------------------------------------------------------------------------
+
+def test_status_shows_local_path(runner):
+    config_json = json.dumps({"profiles": {"default": {"host": "127.0.0.1", "port": 42}}})
+    state = {
+        "state": "running",
+        "project": "Polaroid 04",
+        "localPath": "/tmp/Polaroid 04.codea",
+        "idleTimerDisabled": False,
+        "paused": False,
+    }
+
+    class StubClient:
+        def __init__(self, host, port):
+            self.host = host
+            self.port = port
+
+        def get_device_state(self):
+            return state
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_file = Path(tmpdir) / "config.json"
+        config_file.write_text(config_json, encoding="utf-8")
+
+        with patch("codea.cli.CONFIG_FILE", config_file), \
+             patch("codea.cli.MCPClient", StubClient):
+            result = runner.invoke(main, ["status"])
+
+    assert result.exit_code == 0, result.output
+    assert "Host:    127.0.0.1" in result.output
+    assert "Port:    42" in result.output
+    assert "State:   Running: Polaroid 04" in result.output
+    assert "Local path: /tmp/Polaroid 04.codea" in result.output
+
+
+def test_status_omits_local_path_when_absent(runner):
+    config_json = json.dumps({"profiles": {"default": {"host": "127.0.0.1", "port": 42}}})
+    state = {
+        "state": "none",
+        "project": None,
+        "idleTimerDisabled": False,
+        "paused": None,
+    }
+
+    class StubClient:
+        def __init__(self, host, port):
+            self.host = host
+            self.port = port
+
+        def get_device_state(self):
+            return state
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_file = Path(tmpdir) / "config.json"
+        config_file.write_text(config_json, encoding="utf-8")
+
+        with patch("codea.cli.CONFIG_FILE", config_file), \
+             patch("codea.cli.MCPClient", StubClient):
+            result = runner.invoke(main, ["status"])
+
+    assert result.exit_code == 0, result.output
+    assert "Local path:" not in result.output
+
+
+def test_new_creates_local_bundle_by_default(runner, tmp_path):
+    with patch("codea.cli.load_config", return_value={}), \
+         patch("codea.cli.Path.cwd", return_value=tmp_path):
+        result = runner.invoke(main, ["new", "MyGame"])
+
+    assert result.exit_code == 0, result.output
+    project_dir = (tmp_path / "MyGame.codea").resolve()
+    assert project_dir.is_dir()
+    assert (project_dir / "Main.lua").exists()
+    assert (project_dir / "Info.plist").exists()
+    assert f"Path: {project_dir}" in result.output
+
+
+def test_new_folder_creates_plain_directory_path(runner, tmp_path):
+    with patch("codea.cli.load_config", return_value={}), \
+         patch("codea.cli.Path.cwd", return_value=tmp_path):
+        result = runner.invoke(main, ["new", "MyGame", "--folder"])
+
+    assert result.exit_code == 0, result.output
+    project_dir = (tmp_path / "MyGame").resolve()
+    assert project_dir.is_dir()
+    assert (project_dir / "Main.lua").exists()
+    assert (project_dir / "Info.plist").exists()
+
+
+def test_new_explicit_relative_path_stays_local(runner, tmp_path):
+    class StubClient:
+        def get_device_state(self):
+            return {"projectStorage": "filesystem"}
+
+    with patch("codea.cli.load_config", return_value={"host": "127.0.0.1", "port": 42}), \
+         patch("codea.cli.get_client", return_value=StubClient()), \
+         patch("codea.cli.Path.cwd", return_value=tmp_path):
+        result = runner.invoke(main, ["new", "Subfolder/MyGame"])
+
+    assert result.exit_code == 0, result.output
+    project_dir = (tmp_path / "Subfolder" / "MyGame.codea").resolve()
+    assert project_dir.is_dir()
+    assert (project_dir / "Main.lua").exists()
+    assert "collection" not in result.output
+
+
+def test_new_unreachable_device_falls_back_to_local(runner, tmp_path):
+    with patch("codea.cli.load_config", return_value={"host": "127.0.0.1", "port": 42}), \
+         patch("codea.cli.get_client", side_effect=RuntimeError("offline")), \
+         patch("codea.cli.Path.cwd", return_value=tmp_path):
+        result = runner.invoke(main, ["new", "OfflineGame"])
+
+    assert result.exit_code == 0, result.output
+    assert ((tmp_path / "OfflineGame.codea").resolve() / "Main.lua").exists()
+
+
+def test_new_collection_path_for_collection_storage(runner):
+    captured = {}
+
+    class StubClient:
+        def get_device_state(self):
+            return {"projectStorage": "collections"}
+
+        def call_tool(self, name, arguments=None):
+            captured["arguments"] = arguments or {}
+            return {"content": [{"type": "text", "text": "ok"}]}
+
+        def text(self, result):
+            return result["content"][0]["text"]
+
+    with patch("codea.cli.load_config", return_value={"host": "127.0.0.1", "port": 42}), \
+         patch("codea.cli.get_client", return_value=StubClient()):
+        result = runner.invoke(main, ["new", "Documents/MyGame"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["arguments"]["name"] == "MyGame"
+    assert captured["arguments"]["collection"] == "Documents"
+    assert "path" not in captured["arguments"]
